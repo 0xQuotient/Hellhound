@@ -337,6 +337,7 @@ export default function HellhoundTerminal() {
   // a copy, and the drop zone below to bring prior exports back in.
 
   useEffect(() => {
+    setNow(new Date());
     const t = setInterval(() => setNow(new Date()), 1000);
     return () => clearInterval(t);
   }, []);
