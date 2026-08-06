@@ -223,32 +223,8 @@ function StatChip({ label, value }) {
 
 const inputCls = "bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-xs text-zinc-300 focus:outline-none focus:border-rose-500/50 transition-colors";
 
-function ImportDropzone({ onFiles }) {
-  const [isDragging, setIsDragging] = useState(false);
-  const fileInputRef = useRef(null);
 
-  return (
-    <div
-      onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
-      onDragLeave={() => setIsDragging(false)}
-      onDrop={(e) => { e.preventDefault(); setIsDragging(false); if (e.dataTransfer.files?.length) onFiles(e.dataTransfer.files); }}
-      onClick={() => fileInputRef.current?.click()}
-      className={`border border-dashed rounded-2xl px-4 py-5 text-center cursor-pointer transition-colors ${isDragging ? 'border-rose-500/50 bg-rose-500/5' : 'border-white/10 hover:border-white/20'}`}
-    >
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept=".json,application/json"
-        multiple
-        className="hidden"
-        onChange={(e) => { if (e.target.files?.length) onFiles(e.target.files); e.target.value = ''; }}
-      />
-      <Upload className="w-4 h-4 text-zinc-600 mx-auto mb-1.5" />
-      <p className="text-xs text-zinc-500">Drop exported analysis files here, or click to browse</p>
-      <p className="text-xs text-zinc-600 mt-0.5">Nothing is stored automatically — this only loads what you drop in, for this session</p>
-    </div>
-  );
-}
+
 
 /* ============================================================
    MAIN COMPONENT
