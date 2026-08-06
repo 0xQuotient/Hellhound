@@ -11,77 +11,444 @@
    ------------------------------------------------------------ */
 
 export const LEXICONS = {
-  urgency: ['immediately', 'urgent', 'urgently', 'right away', 'act now', 'without delay', 'expire', 'expires', 'expiring', 'expired', 'deadline', 'final notice', 'last chance', 'time-sensitive', 'time sensitive', 'hurry', 'asap', '24 hours', '48 hours', 'today only', 'before end of day', 'eod', 'promptly'],
-  scarcity: ['limited', 'only a few', 'exclusive', 'while supplies last', 'one-time', "won't last", 'running out', 'last remaining', 'spots left', 'few remaining', 'limited slots', 'first come'],
-  authority: ['ceo', 'cfo', 'director', 'official', 'legal department', 'compliance', 'required by law', 'mandatory', 'verified', 'certified', 'irs', 'law enforcement', 'security team', 'it department', 'it support', 'helpdesk', 'help desk', 'executive', 'management', 'policy requires', 'audit', 'administrator'],
-  fear: ['suspend', 'suspended', 'suspension', 'terminate', 'terminated', 'termination', 'penalty', 'fine', 'locked', 'lockout', 'compromised', 'unauthorized', 'breach', 'failure to comply', 'account closure', 'legal action', 'disabled', 'revoked', 'at risk', 'violation', 'fraud']
+  urgency: [
+    "immediately",
+    "urgent",
+    "urgently",
+    "right away",
+    "act now",
+    "without delay",
+    "expire",
+    "expires",
+    "expiring",
+    "expired",
+    "deadline",
+    "final notice",
+    "last chance",
+    "time-sensitive",
+    "time sensitive",
+    "hurry",
+    "asap",
+    "24 hours",
+    "48 hours",
+    "today only",
+    "before end of day",
+    "eod",
+    "promptly",
+  ],
+  scarcity: [
+    "limited",
+    "only a few",
+    "exclusive",
+    "while supplies last",
+    "one-time",
+    "won't last",
+    "running out",
+    "last remaining",
+    "spots left",
+    "few remaining",
+    "limited slots",
+    "first come",
+  ],
+  authority: [
+    "ceo",
+    "cfo",
+    "director",
+    "official",
+    "legal department",
+    "compliance",
+    "required by law",
+    "mandatory",
+    "verified",
+    "certified",
+    "irs",
+    "law enforcement",
+    "security team",
+    "it department",
+    "it support",
+    "helpdesk",
+    "help desk",
+    "executive",
+    "management",
+    "policy requires",
+    "audit",
+    "administrator",
+  ],
+  fear: [
+    "suspend",
+    "suspended",
+    "suspension",
+    "terminate",
+    "terminated",
+    "termination",
+    "penalty",
+    "fine",
+    "locked",
+    "lockout",
+    "compromised",
+    "unauthorized",
+    "breach",
+    "failure to comply",
+    "account closure",
+    "legal action",
+    "disabled",
+    "revoked",
+    "at risk",
+    "violation",
+    "fraud",
+  ],
 };
 
 export const LEXICON_LABELS = {
-  urgency: 'Urgency',
-  scarcity: 'Scarcity',
-  authority: 'Authority',
-  fear: 'Fear / threat'
+  urgency: "Urgency",
+  scarcity: "Scarcity",
+  authority: "Authority",
+  fear: "Fear / threat",
 };
 
-export const CIALDINI_KEYS = ['reciprocity', 'commitment_consistency', 'social_proof', 'authority', 'liking', 'scarcity', 'unity'];
+export const CIALDINI_KEYS = [
+  "reciprocity",
+  "commitment_consistency",
+  "social_proof",
+  "authority",
+  "liking",
+  "scarcity",
+  "unity",
+];
 export const CIALDINI_LABELS = {
-  reciprocity: 'Reciprocity',
-  commitment_consistency: 'Commitment',
-  social_proof: 'Social proof',
-  authority: 'Authority',
-  liking: 'Liking / similarity',
-  scarcity: 'Scarcity',
-  unity: 'Unity'
+  reciprocity: "Reciprocity",
+  commitment_consistency: "Commitment",
+  social_proof: "Social proof",
+  authority: "Authority",
+  liking: "Liking / similarity",
+  scarcity: "Scarcity",
+  unity: "Unity",
 };
 
 const CIALDINI_TERMS = {
-  reciprocity: ['complimentary', 'free of charge', 'on the house', 'gift', 'bonus', 'as a courtesy', 'we have already', 'i went ahead', 'no cost', 'refund', 'credit to your', 'discount', 'reward', 'favor', 'i helped', 'happy to help'],
-  commitment_consistency: ['as agreed', 'as we discussed', 'per our conversation', 'you requested', 'your request', 'following up', 'you signed up', 'you confirmed', 'as promised', 'to complete your', 'finish setting up', 'you started', 'pending your', 'continue where you left'],
-  social_proof: ['everyone', 'all employees', 'your colleagues', 'most users', 'others have', 'the rest of the team', 'thousands of', 'majority', 'company-wide', 'company wide', 'department has already', 'others in your', 'popular', 'trusted by'],
-  authority: ['ceo', 'cfo', 'coo', 'director', 'vice president', 'official', 'legal department', 'compliance', 'required by law', 'mandatory', 'policy', 'irs', 'law enforcement', 'security team', 'it department', 'it support', 'administrator', 'audit', 'regulation', 'on behalf of', 'authorized'],
-  liking: ['hope you are well', 'hope this finds you', 'great work', 'i enjoyed', 'nice to', 'thanks so much', 'appreciate', 'my friend', 'looking forward', 'congratulations', 'well done', 'as always', 'good to hear'],
-  scarcity: ['limited', 'only a few', 'exclusive', 'while supplies last', 'one-time', 'last chance', 'running out', 'expires', 'expiring', 'deadline', 'final notice', 'spots left', 'today only', 'before it'],
-  unity: ['we', 'our team', 'here at', 'as a family', 'one of us', 'fellow', 'together', 'our company', 'our department', 'us at', 'part of the team', 'our shared']
+  reciprocity: [
+    "complimentary",
+    "free of charge",
+    "on the house",
+    "gift",
+    "bonus",
+    "as a courtesy",
+    "we have already",
+    "i went ahead",
+    "no cost",
+    "refund",
+    "credit to your",
+    "discount",
+    "reward",
+    "favor",
+    "i helped",
+    "happy to help",
+  ],
+  commitment_consistency: [
+    "as agreed",
+    "as we discussed",
+    "per our conversation",
+    "you requested",
+    "your request",
+    "following up",
+    "you signed up",
+    "you confirmed",
+    "as promised",
+    "to complete your",
+    "finish setting up",
+    "you started",
+    "pending your",
+    "continue where you left",
+  ],
+  social_proof: [
+    "everyone",
+    "all employees",
+    "your colleagues",
+    "most users",
+    "others have",
+    "the rest of the team",
+    "thousands of",
+    "majority",
+    "company-wide",
+    "company wide",
+    "department has already",
+    "others in your",
+    "popular",
+    "trusted by",
+  ],
+  authority: [
+    "ceo",
+    "cfo",
+    "coo",
+    "director",
+    "vice president",
+    "official",
+    "legal department",
+    "compliance",
+    "required by law",
+    "mandatory",
+    "policy",
+    "irs",
+    "law enforcement",
+    "security team",
+    "it department",
+    "it support",
+    "administrator",
+    "audit",
+    "regulation",
+    "on behalf of",
+    "authorized",
+  ],
+  liking: [
+    "hope you are well",
+    "hope this finds you",
+    "great work",
+    "i enjoyed",
+    "nice to",
+    "thanks so much",
+    "appreciate",
+    "my friend",
+    "looking forward",
+    "congratulations",
+    "well done",
+    "as always",
+    "good to hear",
+  ],
+  scarcity: [
+    "limited",
+    "only a few",
+    "exclusive",
+    "while supplies last",
+    "one-time",
+    "last chance",
+    "running out",
+    "expires",
+    "expiring",
+    "deadline",
+    "final notice",
+    "spots left",
+    "today only",
+    "before it",
+  ],
+  unity: [
+    "we",
+    "our team",
+    "here at",
+    "as a family",
+    "one of us",
+    "fellow",
+    "together",
+    "our company",
+    "our department",
+    "us at",
+    "part of the team",
+    "our shared",
+  ],
 };
 
-const BENEFIT_TERMS = ['reward', 'bonus', 'gift', 'discount', 'refund', 'win', 'winner', 'prize', 'upgrade', 'free', 'offer', 'benefit', 'raise', 'promotion', 'approved', 'congratulations', 'payout', 'cash back'];
-
-const CTA_VERBS = ['click', 'log in', 'login', 'sign in', 'verify', 'confirm', 'update', 'download', 'open the attachment', 'open attachment', 'reply', 'call', 'wire', 'transfer', 'send', 'pay', 'purchase', 'enter your', 'submit', 'reset', 'authorize', 'approve', 'review and', 'complete the form', 'scan', 'install', 'enable'];
-
-const VERIFY_FRICTION_TERMS = ['do not reply', 'do not contact', 'confidential', 'keep this between', 'i am in a meeting', 'unavailable by phone', 'cannot talk', 'no phone', 'discretion', 'do not discuss', 'only respond to this'];
-
-export const PRETEXT_CATEGORIES = ['IT Support', 'HR', 'Finance', 'Executive', 'Vendor', 'Personal Emergency', 'Delivery', 'Other'];
-
-const PRETEXT_TERMS = {
-  'IT Support': ['password', 'mfa', 'multi-factor', 'two-factor', 'vpn', 'mailbox', 'inbox quota', 'it support', 'helpdesk', 'help desk', 'reset your', 'account access', 'software update', 'security update', 'login attempt', 'sso', 'antivirus', 'system maintenance'],
-  'HR': ['payroll', 'benefits', 'open enrollment', 'handbook', 'performance review', 'onboarding', 'timesheet', 'pto', 'holiday schedule', 'hr department', 'employee survey', 'policy acknowledgment', 'w-2', 'w2'],
-  'Finance': ['invoice', 'payment', 'wire', 'bank', 'account details', 'remittance', 'purchase order', 'accounts payable', 'overdue', 'billing', 'tax', 'irs', 'statement', 'transaction', 'refund'],
-  'Executive': ['ceo', 'cfo', 'coo', 'chief', 'board', 'executive', 'urgent request from', 'discreet', 'president', 'managing director'],
-  'Vendor': ['contract', 'supplier', 'vendor', 'renewal', 'subscription', 'license', 'quote', 'proposal', 'service agreement', 'partner', 'procurement'],
-  'Personal Emergency': ['hospital', 'accident', 'emergency', 'family', 'stranded', 'urgent help', 'medical', 'funeral', 'in trouble', 'need your help right'],
-  'Delivery': ['package', 'parcel', 'shipment', 'delivery', 'tracking', 'courier', 'customs', 'dispatch', 'ups', 'fedex', 'dhl', 'undeliverable', 'redelivery']
-};
-
-export const ATTACK_STAGES = ['Research', 'Hook', 'Trust', 'Exploit', 'Exit'];
-
-export const TLX_DIMS = [
-  { key: 'mental_demand', label: 'Mental demand' },
-  { key: 'temporal_demand', label: 'Temporal demand' },
-  { key: 'effort_to_verify', label: 'Effort to verify' },
-  { key: 'frustration_induced', label: 'Frustration' }
+const BENEFIT_TERMS = [
+  "reward",
+  "bonus",
+  "gift",
+  "discount",
+  "refund",
+  "win",
+  "winner",
+  "prize",
+  "upgrade",
+  "free",
+  "offer",
+  "benefit",
+  "raise",
+  "promotion",
+  "approved",
+  "congratulations",
+  "payout",
+  "cash back",
 ];
 
-export const CHANNELS = ['Email', 'SMS', 'Voice', 'Chat', 'Other'];
-export const OUTCOMES = ['Unknown', 'No Reaction', 'Clicked', 'Reported', 'Credentials Entered'];
+const CTA_VERBS = [
+  "click",
+  "log in",
+  "login",
+  "sign in",
+  "verify",
+  "confirm",
+  "update",
+  "download",
+  "open the attachment",
+  "open attachment",
+  "reply",
+  "call",
+  "wire",
+  "transfer",
+  "send",
+  "pay",
+  "purchase",
+  "enter your",
+  "submit",
+  "reset",
+  "authorize",
+  "approve",
+  "review and",
+  "complete the form",
+  "scan",
+  "install",
+  "enable",
+];
+
+const VERIFY_FRICTION_TERMS = [
+  "do not reply",
+  "do not contact",
+  "confidential",
+  "keep this between",
+  "i am in a meeting",
+  "unavailable by phone",
+  "cannot talk",
+  "no phone",
+  "discretion",
+  "do not discuss",
+  "only respond to this",
+];
+
+export const PRETEXT_CATEGORIES = [
+  "IT Support",
+  "HR",
+  "Finance",
+  "Executive",
+  "Vendor",
+  "Personal Emergency",
+  "Delivery",
+  "Other",
+];
+
+const PRETEXT_TERMS = {
+  "IT Support": [
+    "password",
+    "mfa",
+    "multi-factor",
+    "two-factor",
+    "vpn",
+    "mailbox",
+    "inbox quota",
+    "it support",
+    "helpdesk",
+    "help desk",
+    "reset your",
+    "account access",
+    "software update",
+    "security update",
+    "login attempt",
+    "sso",
+    "antivirus",
+    "system maintenance",
+  ],
+  HR: [
+    "payroll",
+    "benefits",
+    "open enrollment",
+    "handbook",
+    "performance review",
+    "onboarding",
+    "timesheet",
+    "pto",
+    "holiday schedule",
+    "hr department",
+    "employee survey",
+    "policy acknowledgment",
+    "w-2",
+    "w2",
+  ],
+  Finance: [
+    "invoice",
+    "payment",
+    "wire",
+    "bank",
+    "account details",
+    "remittance",
+    "purchase order",
+    "accounts payable",
+    "overdue",
+    "billing",
+    "tax",
+    "irs",
+    "statement",
+    "transaction",
+    "refund",
+  ],
+  Executive: [
+    "ceo",
+    "cfo",
+    "coo",
+    "chief",
+    "board",
+    "executive",
+    "urgent request from",
+    "discreet",
+    "president",
+    "managing director",
+  ],
+  Vendor: [
+    "contract",
+    "supplier",
+    "vendor",
+    "renewal",
+    "subscription",
+    "license",
+    "quote",
+    "proposal",
+    "service agreement",
+    "partner",
+    "procurement",
+  ],
+  "Personal Emergency": [
+    "hospital",
+    "accident",
+    "emergency",
+    "family",
+    "stranded",
+    "urgent help",
+    "medical",
+    "funeral",
+    "in trouble",
+    "need your help right",
+  ],
+  Delivery: [
+    "package",
+    "parcel",
+    "shipment",
+    "delivery",
+    "tracking",
+    "courier",
+    "customs",
+    "dispatch",
+    "ups",
+    "fedex",
+    "dhl",
+    "undeliverable",
+    "redelivery",
+  ],
+};
+
+export const ATTACK_STAGES = ["Research", "Hook", "Trust", "Exploit", "Exit"];
+
+export const TLX_DIMS = [
+  { key: "mental_demand", label: "Mental demand" },
+  { key: "temporal_demand", label: "Temporal demand" },
+  { key: "effort_to_verify", label: "Effort to verify" },
+  { key: "frustration_induced", label: "Frustration" },
+];
+
+export const CHANNELS = ["Email", "SMS", "Voice", "Chat", "Other"];
+export const OUTCOMES = ["Unknown", "No Reaction", "Clicked", "Reported", "Credentials Entered"];
 
 /* Composite index weights — published so the score is auditable. */
 export const COMPOSITE_WEIGHTS = [
-  { key: 'pressure', label: 'Emotional pressure', weight: 0.26 },
-  { key: 'cialdini', label: 'Persuasion principles', weight: 0.24 },
-  { key: 'personalization', label: 'Personalization', weight: 0.18 },
-  { key: 'cta', label: 'Action demand', weight: 0.16 },
-  { key: 'friction', label: 'Verification friction', weight: 0.16 }
+  { key: "pressure", label: "Emotional pressure", weight: 0.26 },
+  { key: "cialdini", label: "Persuasion principles", weight: 0.24 },
+  { key: "personalization", label: "Personalization", weight: 0.18 },
+  { key: "cta", label: "Action demand", weight: 0.16 },
+  { key: "friction", label: "Verification friction", weight: 0.16 },
 ];
 
 /* ------------------------------------------------------------
@@ -137,16 +504,22 @@ function densityScore(hits, wordCount, gain = 26) {
 }
 
 export function countSyllables(word) {
-  const w = word.toLowerCase().replace(/[^a-z]/g, '');
+  const w = word.toLowerCase().replace(/[^a-z]/g, "");
   if (w.length <= 3) return 1;
-  const stripped = w.replace(/(?:[^laeiouy]es|ed|[^laeiouy]e)$/, '').replace(/^y/, '');
+  const stripped = w.replace(/(?:[^laeiouy]es|ed|[^laeiouy]e)$/, "").replace(/^y/, "");
   const matches = stripped.match(/[aeiouy]{1,2}/g);
   return matches ? Math.max(matches.length, 1) : 1;
 }
 
 export function computeReadability(text) {
-  const sentences = text.split(/[.!?]+/).map((s) => s.trim()).filter(Boolean);
-  const words = text.split(/\s+/).map((w) => w.trim()).filter(Boolean);
+  const sentences = text
+    .split(/[.!?]+/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+  const words = text
+    .split(/\s+/)
+    .map((w) => w.trim())
+    .filter(Boolean);
   const sentenceCount = Math.max(sentences.length, 1);
   const wordCount = Math.max(words.length, 1);
   const syllables = words.reduce((sum, w) => sum + countSyllables(w), 0);
@@ -159,12 +532,15 @@ export function computeReadability(text) {
     sentenceCount,
     avgWordsPerSentence: Math.round(avgWordsPerSentence * 10) / 10,
     fleschEase: clamp(round(fleschEase)),
-    fkGrade: Math.max(0, Math.round(fkGrade * 10) / 10)
+    fkGrade: Math.max(0, Math.round(fkGrade * 10) / 10),
   };
 }
 
 export function estimatePassiveVoice(text) {
-  const sentences = text.split(/[.!?]+/).map((s) => s.trim()).filter(Boolean);
+  const sentences = text
+    .split(/[.!?]+/)
+    .map((s) => s.trim())
+    .filter(Boolean);
   if (!sentences.length) return 0;
   const pattern = /\b(am|is|are|was|were|be|been|being)\b\s+\w+(ed|en)\b/i;
   const hits = sentences.filter((s) => pattern.test(s)).length;
@@ -180,16 +556,16 @@ export function scanLexicon(text, wordCount) {
     out[category] = {
       hits: matched.map((h) => h.term),
       count: n,
-      density: wordCount ? Math.round((n / wordCount) * 1000 * 10) / 10 : 0
+      density: wordCount ? Math.round((n / wordCount) * 1000 * 10) / 10 : 0,
     };
   });
   return out;
 }
 
 export function riskTier(score) {
-  if (score < 35) return { label: 'Low', color: 'emerald' };
-  if (score < 70) return { label: 'Moderate', color: 'amber' };
-  return { label: 'High', color: 'red' };
+  if (score < 35) return { label: "Low", color: "emerald" };
+  if (score < 70) return { label: "Moderate", color: "amber" };
+  return { label: "High", color: "red" };
 }
 
 /* ------------------------------------------------------------
@@ -202,11 +578,14 @@ function scoreCialdini(text, wordCount) {
   CIALDINI_KEYS.forEach((key) => {
     const matched = countMatches(lower, CIALDINI_TERMS[key]);
     // "unity" relies on very common pronouns, so it gets a lower gain.
-    const gain = key === 'unity' ? 9 : 26;
+    const gain = key === "unity" ? 9 : 26;
     out[key] = {
       score: densityScore(matched, wordCount, gain),
-      evidence: matched.slice(0, 3).map((h) => h.term).join(', '),
-      matches: totalHits(matched)
+      evidence: matched
+        .slice(0, 3)
+        .map((h) => h.term)
+        .join(", "),
+      matches: totalHits(matched),
     };
   });
   return out;
@@ -220,11 +599,11 @@ function segmentIntensity(segment) {
     fear: densityScore(countMatches(lower, LEXICONS.fear), words),
     scarcity: densityScore(countMatches(lower, LEXICONS.scarcity), words),
     authority: densityScore(countMatches(lower, LEXICONS.authority), words),
-    reward: densityScore(countMatches(lower, BENEFIT_TERMS), words)
+    reward: densityScore(countMatches(lower, BENEFIT_TERMS), words),
   };
   const top = Object.entries(scores).sort((a, b) => b[1] - a[1])[0];
   const intensity = clamp(round(mean(Object.values(scores)) * 1.6));
-  return { emotion: top[1] > 0 ? top[0] : 'neutral', intensity };
+  return { emotion: top[1] > 0 ? top[0] : "neutral", intensity };
 }
 
 function scoreEmotionalPressure(text, wordCount, lexicon) {
@@ -240,21 +619,26 @@ function scoreEmotionalPressure(text, wordCount, lexicon) {
   const words = text.split(/\s+/).filter(Boolean);
   const third = Math.max(1, Math.ceil(words.length / 3));
   const segments = [
-    words.slice(0, third).join(' '),
-    words.slice(third, third * 2).join(' '),
-    words.slice(third * 2).join(' ')
+    words.slice(0, third).join(" "),
+    words.slice(third, third * 2).join(" "),
+    words.slice(third * 2).join(" "),
   ];
-  const stages = ['opening', 'middle', 'close'];
-  const trajectory = segments.map((seg, i) => ({ stage: stages[i], ...segmentIntensity(seg || '') }));
+  const stages = ["opening", "middle", "close"];
+  const trajectory = segments.map((seg, i) => ({
+    stage: stages[i],
+    ...segmentIntensity(seg || ""),
+  }));
 
   const urgencyScarcity = clamp(round(urgency * 0.65 + scarcity * 0.35));
-  const overallPull = clamp(round(urgencyScarcity * 0.45 + fear * 0.35 + Math.abs(threatBenefit - 50) * 0.4));
+  const overallPull = clamp(
+    round(urgencyScarcity * 0.45 + fear * 0.35 + Math.abs(threatBenefit - 50) * 0.4),
+  );
 
   return {
     overall_pull: overallPull,
     urgency_scarcity: urgencyScarcity,
     threat_benefit_ratio: threatBenefit,
-    trajectory
+    trajectory,
   };
 }
 
@@ -262,10 +646,11 @@ function scorePersonalization(text, wordCount) {
   const patterns = {
     emails: /[\w.+-]+@[\w-]+\.[\w.]+/g,
     money: /(?:[$€£]\s?\d[\d,.]*|\b\d[\d,.]*\s?(?:usd|eur|gbp|dollars)\b)/gi,
-    dates: /\b(?:\d{1,2}[/-]\d{1,2}(?:[/-]\d{2,4})?|(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s+\d{1,2})\b/gi,
+    dates:
+      /\b(?:\d{1,2}[/-]\d{1,2}(?:[/-]\d{2,4})?|(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s+\d{1,2})\b/gi,
     ids: /\b(?:[A-Z]{2,}-?\d{3,}|#\d{3,}|\d{6,})\b/g,
     times: /\b\d{1,2}(?::\d{2})?\s?(?:am|pm)\b/gi,
-    phones: /\b(?:\+?\d[\d\s().-]{7,}\d)\b/g
+    phones: /\b(?:\+?\d[\d\s().-]{7,}\d)\b/g,
   };
   const counts = {};
   let dataPoints = 0;
@@ -278,27 +663,45 @@ function scorePersonalization(text, wordCount) {
   // Proper nouns that are not sentence-initial: names, companies, products.
   const properNouns = (text.match(/(?:[^.!?]\s)([A-Z][a-z]{2,})/g) || []).length;
   const secondPerson = (text.match(/\b(you|your|you're|yours)\b/gi) || []).length;
-  const roleTerms = totalHits(countMatches(text.toLowerCase(), ['your team', 'your department', 'your manager', 'your account', 'your role', 'your recent', 'your last', 'your colleague', 'your device', 'your login']));
+  const roleTerms = totalHits(
+    countMatches(text.toLowerCase(), [
+      "your team",
+      "your department",
+      "your manager",
+      "your account",
+      "your role",
+      "your recent",
+      "your last",
+      "your colleague",
+      "your device",
+      "your login",
+    ]),
+  );
 
-  const dataDensity = clamp(round(((dataPoints + properNouns * 0.5) / Math.max(wordCount, 1)) * 100 * 18));
+  const dataDensity = clamp(
+    round(((dataPoints + properNouns * 0.5) / Math.max(wordCount, 1)) * 100 * 18),
+  );
   const secondPersonDensity = clamp(round((secondPerson / Math.max(wordCount, 1)) * 100 * 14));
   const roleFit = clamp(round(secondPersonDensity * 0.55 + roleTerms * 16));
 
-  let source = 'public';
-  if (dataDensity >= 55 || counts.ids > 0 || roleTerms >= 2) source = 'private';
-  else if (dataDensity >= 25 || counts.emails > 0 || counts.money > 0) source = 'mixed';
+  let source = "public";
+  if (dataDensity >= 55 || counts.ids > 0 || roleTerms >= 2) source = "private";
+  else if (dataDensity >= 25 || counts.emails > 0 || counts.money > 0) source = "mixed";
 
   return {
     data_point_density: dataDensity,
     source_likelihood: source,
     role_context_fit: roleFit,
-    counts: { ...counts, properNouns, secondPerson, roleTerms }
+    counts: { ...counts, properNouns, secondPerson, roleTerms },
   };
 }
 
 function scoreLinguistic(text, readability) {
   const lower = text.toLowerCase();
-  const sentences = text.split(/[.!?\n]+/).map((s) => s.trim()).filter(Boolean);
+  const sentences = text
+    .split(/[.!?\n]+/)
+    .map((s) => s.trim())
+    .filter(Boolean);
   const lengths = sentences.map((s) => s.split(/\s+/).filter(Boolean).length);
   const spread = lengths.length > 1 ? stdev(lengths) / Math.max(mean(lengths), 1) : 0;
   const registerConsistency = clamp(round(100 - spread * 95));
@@ -307,19 +710,34 @@ function scoreLinguistic(text, readability) {
   const links = (text.match(/https?:\/\/\S+|\bwww\.\S+/gi) || []).length;
   const numberedSteps = (text.match(/^\s*(?:\d+[.)]|[-*•])\s+/gm) || []).length;
   const ctaSteps = Math.max(totalHits(ctaHits) + links, numberedSteps);
-  const ctaClarity = clamp(round((ctaHits.length ? 45 : 0) + (links ? 25 : 0) + (numberedSteps ? 20 : 0) + Math.min(totalHits(ctaHits), 4) * 7));
+  const ctaClarity = clamp(
+    round(
+      (ctaHits.length ? 45 : 0) +
+        (links ? 25 : 0) +
+        (numberedSteps ? 20 : 0) +
+        Math.min(totalHits(ctaHits), 4) * 7,
+    ),
+  );
 
   const shoutedWords = (text.match(/\b[A-Z]{4,}\b/g) || []).length;
   const repeatedPunct = (text.match(/[!?]{2,}/g) || []).length;
   const spacingErrors = (text.match(/\s{3,}|\s+[,.]/g) || []).length;
-  const surfaceQuality = clamp(round(100 - shoutedWords * 6 - repeatedPunct * 10 - spacingErrors * 5 - (readability.fkGrade > 16 ? 10 : 0)));
+  const surfaceQuality = clamp(
+    round(
+      100 -
+        shoutedWords * 6 -
+        repeatedPunct * 10 -
+        spacingErrors * 5 -
+        (readability.fkGrade > 16 ? 10 : 0),
+    ),
+  );
 
   return {
     register_consistency: registerConsistency,
     cta_clarity: ctaClarity,
     cta_steps: ctaSteps,
     surface_quality: surfaceQuality,
-    links
+    links,
   };
 }
 
@@ -329,19 +747,25 @@ function scoreCognitiveLoad(readability, pressure, linguistic, text) {
   const mental = clamp(round(readability.fkGrade * 5 + readability.avgWordsPerSentence * 1.2));
   const temporal = pressure.urgency_scarcity;
   const effort = clamp(round(linguistic.links * 18 + friction * 22 + linguistic.cta_steps * 6));
-  const frustration = clamp(round(pressure.threat_benefit_ratio * 0.4 + linguistic.cta_steps * 7 + (100 - linguistic.surface_quality) * 0.35));
+  const frustration = clamp(
+    round(
+      pressure.threat_benefit_ratio * 0.4 +
+        linguistic.cta_steps * 7 +
+        (100 - linguistic.surface_quality) * 0.35,
+    ),
+  );
   return {
     mental_demand: mental,
     temporal_demand: temporal,
     effort_to_verify: effort,
     frustration_induced: frustration,
-    verification_friction: clamp(round(effort * 0.7 + friction * 15))
+    verification_friction: clamp(round(effort * 0.7 + friction * 15)),
   };
 }
 
 function scorePretext(text) {
   const lower = text.toLowerCase();
-  let best = { category: 'Other', score: 0 };
+  let best = { category: "Other", score: 0 };
   const table = [];
   Object.entries(PRETEXT_TERMS).forEach(([category, terms]) => {
     const matched = countMatches(lower, terms);
@@ -353,13 +777,14 @@ function scorePretext(text) {
 }
 
 function pickStage(pressure, personalization, linguistic, cialdini) {
-  const trust = (cialdini.liking.score + cialdini.unity.score + cialdini.commitment_consistency.score) / 3;
-  if (linguistic.cta_clarity >= 55 && pressure.urgency_scarcity >= 40) return 'Exploit';
-  if (linguistic.cta_clarity >= 55) return 'Hook';
-  if (trust >= 30 && linguistic.cta_clarity < 45) return 'Trust';
-  if (personalization.data_point_density >= 45 && linguistic.cta_clarity < 30) return 'Research';
-  if (pressure.overall_pull < 20 && linguistic.cta_clarity < 25) return 'Exit';
-  return 'Hook';
+  const trust =
+    (cialdini.liking.score + cialdini.unity.score + cialdini.commitment_consistency.score) / 3;
+  if (linguistic.cta_clarity >= 55 && pressure.urgency_scarcity >= 40) return "Exploit";
+  if (linguistic.cta_clarity >= 55) return "Hook";
+  if (trust >= 30 && linguistic.cta_clarity < 45) return "Trust";
+  if (personalization.data_point_density >= 45 && linguistic.cta_clarity < 30) return "Research";
+  if (pressure.overall_pull < 20 && linguistic.cta_clarity < 25) return "Exit";
+  return "Hook";
 }
 
 /* ------------------------------------------------------------
@@ -367,7 +792,7 @@ function pickStage(pressure, personalization, linguistic, cialdini) {
    ------------------------------------------------------------ */
 
 export function analyzeText(rawText, meta = {}) {
-  const text = String(rawText || '').trim();
+  const text = String(rawText || "").trim();
   const readability = computeReadability(text);
   const wordCount = readability.wordCount;
   const passive = estimatePassiveVoice(text);
@@ -380,31 +805,35 @@ export function analyzeText(rawText, meta = {}) {
   const cognitive = scoreCognitiveLoad(readability, emotional, linguistic, text);
   const pretext = scorePretext(text);
 
-  const cialdiniTop = Object.values(cialdini).map((c) => c.score).sort((a, b) => b - a);
+  const cialdiniTop = Object.values(cialdini)
+    .map((c) => c.score)
+    .sort((a, b) => b - a);
   const components = {
     pressure: clamp(round(emotional.overall_pull * 0.6 + emotional.urgency_scarcity * 0.4)),
     cialdini: clamp(round(mean(cialdiniTop.slice(0, 3)))),
-    personalization: clamp(round(personalization.data_point_density * 0.55 + personalization.role_context_fit * 0.45)),
+    personalization: clamp(
+      round(personalization.data_point_density * 0.55 + personalization.role_context_fit * 0.45),
+    ),
     cta: linguistic.cta_clarity,
-    friction: cognitive.verification_friction
+    friction: cognitive.verification_friction,
   };
   const compositeIndex = clamp(
-    round(COMPOSITE_WEIGHTS.reduce((sum, w) => sum + components[w.key] * w.weight, 0))
+    round(COMPOSITE_WEIGHTS.reduce((sum, w) => sum + components[w.key] * w.weight, 0)),
   );
 
   const stage = pickStage(emotional, personalization, linguistic, cialdini);
   const topPrinciple = Object.entries(cialdini).sort((a, b) => b[1].score - a[1].score)[0];
-  const topComponent = COMPOSITE_WEIGHTS
-    .map((w) => ({ ...w, value: components[w.key] }))
-    .sort((a, b) => b.value - a.value)[0];
+  const topComponent = COMPOSITE_WEIGHTS.map((w) => ({ ...w, value: components[w.key] })).sort(
+    (a, b) => b.value - a.value,
+  )[0];
 
   const summary =
     `Rubric score ${compositeIndex}/100 (${riskTier(compositeIndex).label}); the largest contributor is ` +
     `${topComponent.label.toLowerCase()} at ${topComponent.value}. ` +
     `Strongest persuasion principle is ${CIALDINI_LABELS[topPrinciple[0]].toLowerCase()} (${topPrinciple[1].score})` +
-    `${topPrinciple[1].evidence ? `, matched on "${topPrinciple[1].evidence}"` : ''}. ` +
-    `Framing is ${emotional.threat_benefit_ratio >= 50 ? 'threat-weighted' : 'benefit-weighted'} at ` +
-    `${emotional.threat_benefit_ratio}/100, with ${linguistic.cta_steps} requested action${linguistic.cta_steps === 1 ? '' : 's'} ` +
+    `${topPrinciple[1].evidence ? `, matched on "${topPrinciple[1].evidence}"` : ""}. ` +
+    `Framing is ${emotional.threat_benefit_ratio >= 50 ? "threat-weighted" : "benefit-weighted"} at ` +
+    `${emotional.threat_benefit_ratio}/100, with ${linguistic.cta_steps} requested action${linguistic.cta_steps === 1 ? "" : "s"} ` +
     `and a grade-${readability.fkGrade} reading level.`;
 
   const semantic = {
@@ -412,7 +841,7 @@ export function analyzeText(rawText, meta = {}) {
     components,
     pretext: {
       category: pretext.category,
-      specificity: clamp(round(personalization.data_point_density * 0.5 + pretext.strength * 12))
+      specificity: clamp(round(personalization.data_point_density * 0.5 + pretext.strength * 12)),
     },
     cialdini,
     emotional_pressure: emotional,
@@ -423,7 +852,7 @@ export function analyzeText(rawText, meta = {}) {
     attack_cycle_rationale:
       `Stage inferred from action demand ${linguistic.cta_clarity}, urgency ${emotional.urgency_scarcity}, ` +
       `rapport ${round((cialdini.liking.score + cialdini.unity.score) / 2)} and personalization ${personalization.data_point_density}.`,
-    analyst_summary: summary
+    analyst_summary: summary,
   };
 
   return {
@@ -433,12 +862,12 @@ export function analyzeText(rawText, meta = {}) {
     lexicon,
     semantic,
     meta: {
-      label: meta.label || '',
-      channel: meta.channel || 'Email',
-      outcome: meta.outcome || 'Unknown'
+      label: meta.label || "",
+      channel: meta.channel || "Email",
+      outcome: meta.outcome || "Unknown",
     },
     text,
-    excerpt: text.slice(0, 120)
+    excerpt: text.slice(0, 120),
   };
 }
 
@@ -472,23 +901,23 @@ export function toEntry(analysis, index = 0) {
     readingGrade: analysis.readability.fkGrade,
     wordCount: analysis.readability.wordCount,
     lexicon: Object.fromEntries(Object.entries(analysis.lexicon).map(([k, v]) => [k, v.hits])),
-    full: analysis
+    full: analysis,
   };
 }
 
 /* Dimensions used for corpus aggregation and campaign comparison. */
 export const DIMENSIONS = [
-  { key: 'compositeIndex', label: 'Composite index' },
-  { key: 'pressure', label: 'Emotional pressure' },
-  { key: 'urgency', label: 'Urgency / scarcity' },
-  { key: 'threatFraming', label: 'Threat framing' },
-  { key: 'personalization', label: 'Personalization' },
-  { key: 'authority', label: 'Authority' },
-  { key: 'ctaClarity', label: 'Action demand' },
-  { key: 'verificationFriction', label: 'Verification friction' },
-  { key: 'registerConsistency', label: 'Register consistency' },
-  { key: 'surfaceQuality', label: 'Surface quality' },
-  { key: 'readingGrade', label: 'Reading grade' }
+  { key: "compositeIndex", label: "Composite index" },
+  { key: "pressure", label: "Emotional pressure" },
+  { key: "urgency", label: "Urgency / scarcity" },
+  { key: "threatFraming", label: "Threat framing" },
+  { key: "personalization", label: "Personalization" },
+  { key: "authority", label: "Authority" },
+  { key: "ctaClarity", label: "Action demand" },
+  { key: "verificationFriction", label: "Verification friction" },
+  { key: "registerConsistency", label: "Register consistency" },
+  { key: "surfaceQuality", label: "Surface quality" },
+  { key: "readingGrade", label: "Reading grade" },
 ];
 
 /* ------------------------------------------------------------
@@ -498,7 +927,7 @@ export const DIMENSIONS = [
 export const BATCH_DELIMITER = /^\s*---+\s*$/m;
 
 export function splitBatchText(text) {
-  return String(text || '')
+  return String(text || "")
     .split(/^\s*---+\s*$/m)
     .map((s) => s.trim())
     .filter((s) => s.length > 0);
@@ -506,21 +935,32 @@ export function splitBatchText(text) {
 
 function parseCsv(content) {
   const rows = [];
-  let field = '';
+  let field = "";
   let row = [];
   let inQuotes = false;
   for (let i = 0; i < content.length; i++) {
     const ch = content[i];
     if (inQuotes) {
-      if (ch === '"' && content[i + 1] === '"') { field += '"'; i++; }
-      else if (ch === '"') inQuotes = false;
+      if (ch === '"' && content[i + 1] === '"') {
+        field += '"';
+        i++;
+      } else if (ch === '"') inQuotes = false;
       else field += ch;
     } else if (ch === '"') inQuotes = true;
-    else if (ch === ',') { row.push(field); field = ''; }
-    else if (ch === '\n') { row.push(field); rows.push(row); row = []; field = ''; }
-    else if (ch !== '\r') field += ch;
+    else if (ch === ",") {
+      row.push(field);
+      field = "";
+    } else if (ch === "\n") {
+      row.push(field);
+      rows.push(row);
+      row = [];
+      field = "";
+    } else if (ch !== "\r") field += ch;
   }
-  if (field.length || row.length) { row.push(field); rows.push(row); }
+  if (field.length || row.length) {
+    row.push(field);
+    rows.push(row);
+  }
   return rows.filter((r) => r.some((c) => c.trim().length));
 }
 
@@ -528,19 +968,20 @@ function messagesFromCsv(content) {
   const rows = parseCsv(content);
   if (!rows.length) return [];
   const header = rows[0].map((h) => h.trim().toLowerCase());
-  const textIdx = header.findIndex((h) => ['text', 'body', 'message', 'content'].includes(h));
+  const textIdx = header.findIndex((h) => ["text", "body", "message", "content"].includes(h));
   if (textIdx === -1) {
-    return rows.map((r) => ({ text: r.join(' ').trim() })).filter((m) => m.text);
+    return rows.map((r) => ({ text: r.join(" ").trim() })).filter((m) => m.text);
   }
-  const channelIdx = header.indexOf('channel');
-  const outcomeIdx = header.indexOf('outcome');
-  const labelIdx = header.findIndex((h) => ['label', 'id', 'subject', 'name'].includes(h));
-  return rows.slice(1)
+  const channelIdx = header.indexOf("channel");
+  const outcomeIdx = header.indexOf("outcome");
+  const labelIdx = header.findIndex((h) => ["label", "id", "subject", "name"].includes(h));
+  return rows
+    .slice(1)
     .map((r) => ({
-      text: (r[textIdx] || '').trim(),
-      channel: channelIdx > -1 ? (r[channelIdx] || '').trim() : undefined,
-      outcome: outcomeIdx > -1 ? (r[outcomeIdx] || '').trim() : undefined,
-      label: labelIdx > -1 ? (r[labelIdx] || '').trim() : undefined
+      text: (r[textIdx] || "").trim(),
+      channel: channelIdx > -1 ? (r[channelIdx] || "").trim() : undefined,
+      outcome: outcomeIdx > -1 ? (r[outcomeIdx] || "").trim() : undefined,
+      label: labelIdx > -1 ? (r[labelIdx] || "").trim() : undefined,
     }))
     .filter((m) => m.text);
 }
@@ -548,21 +989,26 @@ function messagesFromCsv(content) {
 function messagesFromJson(content) {
   const parsed = JSON.parse(content);
   const pick = (o) => ({
-    text: String(o.text || o.body || o.message || o.content || '').trim(),
+    text: String(o.text || o.body || o.message || o.content || "").trim(),
     channel: o.channel,
     outcome: o.outcome,
-    label: o.label || o.id || o.subject
+    label: o.label || o.id || o.subject,
   });
   if (Array.isArray(parsed)) {
     return parsed
-      .map((o) => (typeof o === 'string' ? { text: o.trim() } : pick(o)))
+      .map((o) => (typeof o === "string" ? { text: o.trim() } : pick(o)))
       .filter((m) => m.text);
   }
   // A campaign bundle exported by this tool.
   if (Array.isArray(parsed.messages)) return parsed.messages.map(pick).filter((m) => m.text);
   if (Array.isArray(parsed.entries)) {
     return parsed.entries
-      .map((e) => ({ text: e.text || e.excerpt || '', channel: e.channel, outcome: e.outcome, label: e.label }))
+      .map((e) => ({
+        text: e.text || e.excerpt || "",
+        channel: e.channel,
+        outcome: e.outcome,
+        label: e.label,
+      }))
       .filter((m) => m.text);
   }
   const single = pick(parsed);
@@ -579,8 +1025,8 @@ export async function messagesFromFiles(fileList) {
       const content = await file.text();
       const name = file.name.toLowerCase();
       let parsed = [];
-      if (name.endsWith('.json')) parsed = messagesFromJson(content);
-      else if (name.endsWith('.csv')) parsed = messagesFromCsv(content);
+      if (name.endsWith(".json")) parsed = messagesFromJson(content);
+      else if (name.endsWith(".csv")) parsed = messagesFromCsv(content);
       else parsed = splitBatchText(content).map((t) => ({ text: t, label: file.name }));
       if (!parsed.length) failed.push(file.name);
       messages.push(...parsed.map((m) => ({ label: file.name, ...m })));
@@ -598,11 +1044,11 @@ export function analyzeCorpus(messages) {
       toEntry(
         analyzeText(m.text, {
           label: m.label || `msg-${i + 1}`,
-          channel: CHANNELS.includes(m.channel) ? m.channel : m.channel ? 'Other' : 'Email',
-          outcome: OUTCOMES.includes(m.outcome) ? m.outcome : 'Unknown'
+          channel: CHANNELS.includes(m.channel) ? m.channel : m.channel ? "Other" : "Email",
+          outcome: OUTCOMES.includes(m.outcome) ? m.outcome : "Unknown",
         }),
-        i
-      )
+        i,
+      ),
     );
 }
 
@@ -613,7 +1059,7 @@ export function analyzeCorpus(messages) {
 function tally(items, keyFn) {
   const map = {};
   items.forEach((i) => {
-    const k = keyFn(i) || 'Unknown';
+    const k = keyFn(i) || "Unknown";
     map[k] = (map[k] || 0) + 1;
   });
   return Object.entries(map)
@@ -622,9 +1068,13 @@ function tally(items, keyFn) {
 }
 
 function shingles(text, n = 5) {
-  const words = text.toLowerCase().replace(/[^a-z0-9\s]/g, ' ').split(/\s+/).filter(Boolean);
+  const words = text
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, " ")
+    .split(/\s+/)
+    .filter(Boolean);
   const out = new Set();
-  for (let i = 0; i + n <= words.length; i++) out.add(words.slice(i, i + n).join(' '));
+  for (let i = 0; i + n <= words.length; i++) out.add(words.slice(i, i + n).join(" "));
   return out;
 }
 
@@ -643,9 +1093,8 @@ function repeatedPhrases(entries, limit = 6) {
     .map(([phrase, count]) => ({ phrase, count }));
 }
 
-
 function textOf(entry) {
-  return entry.sourceText || entry.excerpt || '';
+  return entry.sourceText || entry.excerpt || "";
 }
 
 export function aggregateCorpus(entries) {
@@ -659,14 +1108,16 @@ export function aggregateCorpus(entries) {
       median: Math.round(median(values) * 10) / 10,
       min: Math.min(...values),
       max: Math.max(...values),
-      stdev: Math.round(stdev(values) * 10) / 10
+      stdev: Math.round(stdev(values) * 10) / 10,
     };
   });
 
   const lexiconTally = {};
   entries.forEach((e) => {
     Object.values(e.lexicon).forEach((hits) => {
-      hits.forEach((h) => { lexiconTally[h] = (lexiconTally[h] || 0) + 1; });
+      hits.forEach((h) => {
+        lexiconTally[h] = (lexiconTally[h] || 0) + 1;
+      });
     });
   });
   const topTriggers = Object.entries(lexiconTally)
@@ -682,37 +1133,60 @@ export function aggregateCorpus(entries) {
 
   const findings = [];
   const idx = stats.compositeIndex;
-  findings.push(`${entries.length} messages scored; composite index averages ${idx.mean} (median ${idx.median}, range ${idx.min}-${idx.max}).`);
-  if (idx.stdev < 8) findings.push(`Very low spread (σ ${idx.stdev}) — the corpus is highly formulaic, consistent with a single template.`);
-  else if (idx.stdev > 22) findings.push(`Wide spread (σ ${idx.stdev}) — the corpus mixes materially different construction styles.`);
+  findings.push(
+    `${entries.length} messages scored; composite index averages ${idx.mean} (median ${idx.median}, range ${idx.min}-${idx.max}).`,
+  );
+  if (idx.stdev < 8)
+    findings.push(
+      `Very low spread (σ ${idx.stdev}) — the corpus is highly formulaic, consistent with a single template.`,
+    );
+  else if (idx.stdev > 22)
+    findings.push(
+      `Wide spread (σ ${idx.stdev}) — the corpus mixes materially different construction styles.`,
+    );
 
-  DIMENSIONS.filter((d) => d.key !== 'compositeIndex' && d.key !== 'readingGrade').forEach((d) => {
+  DIMENSIONS.filter((d) => d.key !== "compositeIndex" && d.key !== "readingGrade").forEach((d) => {
     const s = stats[d.key];
-    if (s.mean >= 65) findings.push(`${d.label} is consistently high across the corpus (mean ${s.mean}).`);
-    if (s.stdev <= 4 && s.mean > 10) findings.push(`${d.label} barely varies (σ ${s.stdev}) — likely fixed by a shared template.`);
+    if (s.mean >= 65)
+      findings.push(`${d.label} is consistently high across the corpus (mean ${s.mean}).`);
+    if (s.stdev <= 4 && s.mean > 10)
+      findings.push(`${d.label} barely varies (σ ${s.stdev}) — likely fixed by a shared template.`);
   });
 
   const pretextMix = tally(entries, (e) => e.pretextCategory);
   if (pretextMix.length && pretextMix[0].pct >= 50) {
-    findings.push(`${pretextMix[0].pct}% of messages use the same pretext family: ${pretextMix[0].key}.`);
+    findings.push(
+      `${pretextMix[0].pct}% of messages use the same pretext family: ${pretextMix[0].key}.`,
+    );
   }
 
   const phrases = repeatedPhrases(entries);
   if (phrases.length) {
-    findings.push(`Recurring phrasing detected: "${phrases[0].phrase}" appears in ${phrases[0].count} messages.`);
+    findings.push(
+      `Recurring phrasing detected: "${phrases[0].phrase}" appears in ${phrases[0].count} messages.`,
+    );
   }
 
   // Outcome correlation, only when outcomes were supplied.
-  const withOutcome = entries.filter((e) => e.outcome && e.outcome !== 'Unknown');
-  const succeeded = withOutcome.filter((e) => e.outcome === 'Clicked' || e.outcome === 'Credentials Entered');
+  const withOutcome = entries.filter((e) => e.outcome && e.outcome !== "Unknown");
+  const succeeded = withOutcome.filter(
+    (e) => e.outcome === "Clicked" || e.outcome === "Credentials Entered",
+  );
   let outcomeSignal = null;
   if (succeeded.length >= 2 && withOutcome.length - succeeded.length >= 2) {
     const others = withOutcome.filter((e) => !succeeded.includes(e));
     outcomeSignal = DIMENSIONS.map((d) => ({
       label: d.label,
-      delta: Math.round((mean(succeeded.map((e) => e[d.key])) - mean(others.map((e) => e[d.key]))) * 10) / 10
-    })).sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta)).slice(0, 4);
-    findings.push(`Among ${withOutcome.length} messages with recorded outcomes, ${outcomeSignal[0].label.toLowerCase()} differs most between successful and unsuccessful attempts (${outcomeSignal[0].delta > 0 ? '+' : ''}${outcomeSignal[0].delta}).`);
+      delta:
+        Math.round(
+          (mean(succeeded.map((e) => e[d.key])) - mean(others.map((e) => e[d.key]))) * 10,
+        ) / 10,
+    }))
+      .sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta))
+      .slice(0, 4);
+    findings.push(
+      `Among ${withOutcome.length} messages with recorded outcomes, ${outcomeSignal[0].label.toLowerCase()} differs most between successful and unsuccessful attempts (${outcomeSignal[0].delta > 0 ? "+" : ""}${outcomeSignal[0].delta}).`,
+    );
   }
 
   return {
@@ -731,8 +1205,8 @@ export function aggregateCorpus(entries) {
       highest: sortedByIndex[0],
       lowest: sortedByIndex[sortedByIndex.length - 1],
       mostPersonalized: [...entries].sort((a, b) => b.personalization - a.personalization)[0],
-      mostUrgent: [...entries].sort((a, b) => b.urgency - a.urgency)[0]
-    }
+      mostUrgent: [...entries].sort((a, b) => b.urgency - a.urgency)[0],
+    },
   };
 }
 
@@ -742,9 +1216,9 @@ export function aggregateCorpus(entries) {
 
 export function buildCampaign(name, entries) {
   return {
-    name: name || 'Untitled campaign',
+    name: name || "Untitled campaign",
     entries,
-    summary: aggregateCorpus(entries)
+    summary: aggregateCorpus(entries),
   };
 }
 
@@ -758,41 +1232,44 @@ export function compareCampaigns(a, b) {
       label: d.label,
       a: av,
       b: bv,
-      delta: Math.round((bv - av) * 10) / 10
+      delta: Math.round((bv - av) * 10) / 10,
     };
   });
 
-  const radar = DIMENSIONS.filter((d) => d.key !== 'readingGrade').map((d) => ({
+  const radar = DIMENSIONS.filter((d) => d.key !== "readingGrade").map((d) => ({
     dimension: d.label,
     A: a.summary.stats[d.key].mean,
-    B: b.summary.stats[d.key].mean
+    B: b.summary.stats[d.key].mean,
   }));
 
   const findings = [];
-  const ci = deltas.find((d) => d.key === 'compositeIndex');
+  const ci = deltas.find((d) => d.key === "compositeIndex");
   findings.push(
     `${a.name}: ${a.entries.length} messages, mean index ${ci.a}. ${b.name}: ${b.entries.length} messages, mean index ${ci.b}. ` +
-    `${Math.abs(ci.delta) < 2 ? 'The two campaigns score within noise of each other.' : `${ci.delta > 0 ? b.name : a.name} runs ${Math.abs(ci.delta)} points higher overall.`}`
+      `${Math.abs(ci.delta) < 2 ? "The two campaigns score within noise of each other." : `${ci.delta > 0 ? b.name : a.name} runs ${Math.abs(ci.delta)} points higher overall.`}`,
   );
 
   [...deltas]
-    .filter((d) => d.key !== 'compositeIndex')
+    .filter((d) => d.key !== "compositeIndex")
     .sort((x, y) => Math.abs(y.delta) - Math.abs(x.delta))
     .slice(0, 3)
     .forEach((d) => {
       if (Math.abs(d.delta) >= 3) {
-        findings.push(`${d.label}: ${d.delta > 0 ? b.name : a.name} is higher by ${Math.abs(d.delta)} (${d.a} vs ${d.b}).`);
+        findings.push(
+          `${d.label}: ${d.delta > 0 ? b.name : a.name} is higher by ${Math.abs(d.delta)} (${d.a} vs ${d.b}).`,
+        );
       }
     });
 
-  const mixLine = (c) => c.summary.channelMix.map((m) => `${m.count} ${m.key.toLowerCase()}`).join(' + ');
+  const mixLine = (c) =>
+    c.summary.channelMix.map((m) => `${m.count} ${m.key.toLowerCase()}`).join(" + ");
   findings.push(`Channel mix — ${a.name}: ${mixLine(a)}. ${b.name}: ${mixLine(b)}.`);
 
   const consistency = (c) => c.summary.stats.compositeIndex.stdev;
   findings.push(
     consistency(a) < consistency(b)
       ? `${a.name} is the more uniform campaign (σ ${consistency(a)} vs ${consistency(b)}).`
-      : `${b.name} is the more uniform campaign (σ ${consistency(b)} vs ${consistency(a)}).`
+      : `${b.name} is the more uniform campaign (σ ${consistency(b)} vs ${consistency(a)}).`,
   );
 
   const sharedPretexts = a.summary.pretextMix
@@ -800,8 +1277,8 @@ export function compareCampaigns(a, b) {
     .map((p) => p.key);
   findings.push(
     sharedPretexts.length
-      ? `Shared pretext families: ${sharedPretexts.join(', ')}.`
-      : 'The campaigns share no pretext family.'
+      ? `Shared pretext families: ${sharedPretexts.join(", ")}.`
+      : "The campaigns share no pretext family.",
   );
 
   return { deltas, radar, findings };
