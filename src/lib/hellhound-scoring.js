@@ -628,7 +628,8 @@ function shingles(text, n = 5) {
 function repeatedPhrases(entries, limit = 6) {
   const counts = new Map();
   entries.forEach((e) => {
-    shingles(e.full.excerpt ? e.full.semantic ? textOf(e) : '' : textOf(e)).forEach((s) => {
+    // Count a phrase once per message, so repetition means "across messages".
+    shingles(textOf(e)).forEach((s) => {
       counts.set(s, (counts.get(s) || 0) + 1);
     });
   });
@@ -638,6 +639,7 @@ function repeatedPhrases(entries, limit = 6) {
     .slice(0, limit)
     .map(([phrase, count]) => ({ phrase, count }));
 }
+
 
 function textOf(entry) {
   return entry.sourceText || entry.excerpt || '';
