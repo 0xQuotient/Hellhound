@@ -30,94 +30,9 @@ const BRAND = {
 };
 
 /* ============================================================
-   CONSTANTS
+   GAUGE GEOMETRY + FORMATTING (presentation only)
+   All scoring constants and math live in @/lib/hellhound-scoring.
    ============================================================ */
-
-const LEXICONS = {
-  urgency: ['immediately', 'urgent', 'right away', 'act now', 'without delay', 'expire', 'expires', 'expiring', 'deadline', 'final notice', 'last chance', 'time-sensitive', 'hurry', 'asap', '24 hours', 'today only'],
-  scarcity: ['limited', 'only a few', 'exclusive', 'while supplies last', 'one-time', "won't last", 'running out', 'last remaining', 'spots left'],
-  authority: ['ceo', 'director', 'official', 'legal department', 'compliance', 'required by law', 'mandatory', 'verified', 'certified', 'irs', 'law enforcement', 'security team', 'it department', 'executive'],
-  fear: ['suspend', 'suspended', 'terminate', 'terminated', 'penalty', 'fine', 'locked', 'compromised', 'unauthorized', 'breach', 'failure to comply', 'account closure', 'legal action']
-};
-const LEXICON_LABELS = { urgency: 'Urgency', scarcity: 'Scarcity', authority: 'Authority', fear: 'Fear / threat' };
-
-const CIALDINI_KEYS = ['reciprocity', 'commitment_consistency', 'social_proof', 'authority', 'liking', 'scarcity', 'unity'];
-const CIALDINI_LABELS = {
-  reciprocity: 'Reciprocity',
-  commitment_consistency: 'Commitment',
-  social_proof: 'Social proof',
-  authority: 'Authority',
-  liking: 'Liking / similarity',
-  scarcity: 'Scarcity',
-  unity: 'Unity'
-};
-
-const ATTACK_STAGES = ['Research', 'Hook', 'Trust', 'Exploit', 'Exit'];
-const TLX_DIMS = [
-  { key: 'mental_demand', label: 'Mental demand' },
-  { key: 'temporal_demand', label: 'Temporal demand' },
-  { key: 'effort_to_verify', label: 'Effort to verify' },
-  { key: 'frustration_induced', label: 'Frustration' }
-];
-
-const PRETEXT_CATEGORIES = ['IT Support', 'HR', 'Finance', 'Executive', 'Vendor', 'Personal Emergency', 'Delivery', 'Other'];
-const CHANNELS = ['Email', 'SMS', 'Voice', 'Other'];
-const OUTCOMES = ['Unknown', 'No Reaction', 'Clicked', 'Reported', 'Credentials Entered'];
-
-/* ============================================================
-   UTILITIES
-   ============================================================ */
-
-function countSyllables(word) {
-  const w = word.toLowerCase().replace(/[^a-z]/g, '');
-  if (w.length <= 3) return 1;
-  const stripped = w.replace(/(?:[^laeiouy]es|ed|[^laeiouy]e)$/, '').replace(/^y/, '');
-  const matches = stripped.match(/[aeiouy]{1,2}/g);
-  return matches ? Math.max(matches.length, 1) : 1;
-}
-
-function computeReadability(text) {
-  const sentences = text.split(/[.!?]+/).map(s => s.trim()).filter(Boolean);
-  const words = text.split(/\s+/).map(w => w.trim()).filter(Boolean);
-  const sentenceCount = Math.max(sentences.length, 1);
-  const wordCount = Math.max(words.length, 1);
-  const syllables = words.reduce((sum, w) => sum + countSyllables(w), 0);
-  const avgWordsPerSentence = wordCount / sentenceCount;
-  const avgSyllablesPerWord = syllables / wordCount;
-  const fleschEase = 206.835 - 1.015 * avgWordsPerSentence - 84.6 * avgSyllablesPerWord;
-  const fkGrade = 0.39 * avgWordsPerSentence + 11.8 * avgSyllablesPerWord - 15.59;
-  return {
-    wordCount,
-    sentenceCount,
-    avgWordsPerSentence: Math.round(avgWordsPerSentence * 10) / 10,
-    fleschEase: Math.max(0, Math.min(100, Math.round(fleschEase))),
-    fkGrade: Math.max(0, Math.round(fkGrade * 10) / 10)
-  };
-}
-
-function estimatePassiveVoice(text) {
-  const sentences = text.split(/[.!?]+/).map(s => s.trim()).filter(Boolean);
-  if (!sentences.length) return 0;
-  const pattern = /\b(am|is|are|was|were|be|been|being)\b\s+\w+(ed|en)\b/i;
-  const hits = sentences.filter(s => pattern.test(s)).length;
-  return Math.round((hits / sentences.length) * 100);
-}
-
-function scanLexicon(text, wordCount) {
-  const lower = text.toLowerCase();
-  const out = {};
-  Object.entries(LEXICONS).forEach(([category, terms]) => {
-    const hits = terms.filter(term => lower.includes(term));
-    out[category] = { hits, density: wordCount ? Math.round((hits.length / wordCount) * 1000 * 10) / 10 : 0 };
-  });
-  return out;
-}
-
-function riskTier(score) {
-  if (score < 35) return { label: 'Low', color: 'emerald' };
-  if (score < 70) return { label: 'Moderate', color: 'amber' };
-  return { label: 'High', color: 'red' };
-}
 
 function polarToCartesian(cx, cy, r, angleDeg) {
   const rad = (angleDeg * Math.PI) / 180;
@@ -133,6 +48,7 @@ function describeArc(cx, cy, r, startAngle, endAngle) {
 
 function formatClock(d) { return d.toLocaleTimeString('en-US', { hour12: false }); }
 function formatDate(d) { return d.toLocaleDateString('en-US', { year: 'numeric', month: '2-digit', day: '2-digit' }); }
+
 
 /* ============================================================
    SUB-COMPONENTS
