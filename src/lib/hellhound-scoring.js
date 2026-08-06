@@ -437,6 +437,7 @@ export function analyzeText(rawText, meta = {}) {
       channel: meta.channel || 'Email',
       outcome: meta.outcome || 'Unknown'
     },
+    text,
     excerpt: text.slice(0, 120)
   };
 }
@@ -451,6 +452,8 @@ export function toEntry(analysis, index = 0) {
     channel: analysis.meta.channel,
     outcome: analysis.meta.outcome,
     excerpt: analysis.excerpt,
+    sourceText: analysis.text,
+
     compositeIndex: s.composite_index,
     stage: s.attack_cycle_stage,
     pretextCategory: s.pretext.category,
