@@ -318,23 +318,249 @@ function ImportDropzone({ onFiles }) {
    MAIN COMPONENT
    ============================================================ */
 
+function BatchDropzone({ onFiles, hint }) {
+  const [isDragging, setIsDragging] = useState(false);
+  const fileInputRef = useRef(null);
+
+  return (
+    <div
+      onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+      onDragLeave={() => setIsDragging(false)}
+      onDrop={(e) => { e.preventDefault(); setIsDragging(false); if (e.dataTransfer.files?.length) onFiles(e.dataTransfer.files); }}
+      onClick={() => fileInputRef.current?.click()}
+      className={`border border-dashed rounded-2xl px-4 py-5 text-center cursor-pointer transition-colors ${isDragging ? 'border-rose-500/50 bg-rose-500/5' : 'border-white/10 hover:border-white/20'}`}
+    >
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".txt,.csv,.json,.eml,.md,text/plain,text/csv,application/json"
+        multiple
+        className="hidden"
+        onChange={(e) => { if (e.target.files?.length) onFiles(e.target.files); e.target.value = ''; }}
+      />
+      <Upload className="w-4 h-4 text-zinc-600 mx-auto mb-1.5" />
+      <p className="text-xs text-zinc-500">{hint || 'Drop .txt / .csv / .json message files here, or click to browse'}</p>
+      <p className="text-xs text-zinc-600 mt-0.5">Read in memory only — nothing is uploaded, nothing is stored</p>
+    </div>
+  );
+}
+
+function ModeTab({ active, onClick, icon: Icon, children }) {
+  return (
+    <button
+      onClick={onClick}
+      className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-colors ${
+        active ? 'bg-rose-500/15 text-rose-300 border border-rose-500/30' : 'text-zinc-500 border border-transparent hover:text-zinc-300'
+      }`}
+    >
+      <Icon className="w-3.5 h-3.5" /> {children}
+    </button>
+  );
+}
+
+function MixBars({ items, total }) {
+  if (!items?.length) return null;
+  return (
+    <div className="space-y-2">
+      {items.map((m) => (
+        <div key={m.key} className="flex items-center gap-3 text-xs">
+          <span className="w-32 truncate text-zinc-300">{m.key}</span>
+          <div className="flex-1 h-1.5 bg-white/5 rounded-full overflow-hidden">
+            <div className="h-full rounded-full bg-gradient-to-r from-rose-600 to-rose-400" style={{ width: `${Math.round((m.count / Math.max(total, 1)) * 100)}%` }} />
+          </div>
+          <span className="w-14 text-right text-zinc-500 font-mono tabular-nums">×{m.count}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function DistributionHistogram({ buckets }) {
+  const max = Math.max(...buckets, 1);
+  const labels = ['0-19', '20-39', '40-59', '60-79', '80-100'];
+  return (
+    <div className="flex items-end gap-2 h-28">
+      {buckets.map((b, i) => (
+        <div key={i} className="flex-1 flex flex-col items-center justify-end h-full">
+          <span className="text-xs text-zinc-500 font-mono tabular-nums mb-1">{b}</span>
+          <div
+            className="w-full rounded-t-lg bg-gradient-to-t from-rose-700/70 to-rose-400"
+            style={{ height: `${Math.max(3, (b / max) * 78)}%` }}
+          />
+          <span className="text-xs text-zinc-600 mt-1.5">{labels[i]}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function DeltaRow({ row, nameA, nameB }) {
+  const positive = row.delta > 0;
+  const magnitude = Math.min(100, Math.abs(row.delta) * 2);
+  return (
+    <div className="grid grid-cols-[9rem_1fr_4.5rem] items-center gap-3 text-xs py-1.5">
+      <span className="truncate text-zinc-300">{row.label}</span>
+      <div className="flex items-center">
+        <div className="flex-1 flex justify-end">
+          <div className="h-1.5 rounded-l-full bg-gradient-to-l from-sky-400 to-sky-600" style={{ width: positive ? 0 : `${magnitude}%` }} />
+        </div>
+        <div className="w-px h-3 bg-white/15" />
+        <div className="flex-1">
+          <div className="h-1.5 rounded-r-full bg-gradient-to-r from-rose-600 to-rose-400" style={{ width: positive ? `${magnitude}%` : 0 }} />
+        </div>
+      </div>
+      <span className="text-right font-mono tabular-nums text-zinc-400" title={`${nameA}: ${row.a} · ${nameB}: ${row.b}`}>
+        {row.a} / {row.b}
+      </span>
+    </div>
+  );
+}
+
+function CorpusTable({ entries }) {
+  const [sortKey, setSortKey] = useState('compositeIndex');
+  const [asc, setAsc] = useState(false);
+  const cols = [
+    { key: 'label', label: 'Message' },
+    { key: 'channel', label: 'Channel' },
+    { key: 'pretextCategory', label: 'Pretext' },
+    { key: 'compositeIndex', label: 'Index' },
+    { key: 'urgency', label: 'Urgency' },
+    { key: 'personalization', label: 'Person.' },
+    { key: 'ctaClarity', label: 'Action' },
+    { key: 'stage', label: 'Stage' }
+  ];
+  const sorted = useMemo(() => {
+    const s = [...entries].sort((a, b) => {
+      const av = a[sortKey], bv = b[sortKey];
+      if (typeof av === 'number' && typeof bv === 'number') return av - bv;
+      return String(av).localeCompare(String(bv));
+    });
+    return asc ? s : s.reverse();
+  }, [entries, sortKey, asc]);
+
+  return (
+    <div className="overflow-x-auto -mx-1 px-1">
+      <table className="w-full text-xs">
+        <thead>
+          <tr className="text-zinc-500">
+            {cols.map((c) => (
+              <th
+                key={c.key}
+                onClick={() => { if (sortKey === c.key) setAsc(!asc); else { setSortKey(c.key); setAsc(false); } }}
+                className={`text-left font-normal py-2 pr-3 cursor-pointer whitespace-nowrap hover:text-zinc-300 ${sortKey === c.key ? 'text-rose-300' : ''}`}
+              >
+                {c.label}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-white/5">
+          {sorted.slice(0, 200).map((e) => (
+            <tr key={e.id} className="text-zinc-400">
+              <td className="py-2 pr-3 max-w-[16rem] truncate text-zinc-300" title={e.excerpt}>{e.label || e.excerpt.slice(0, 40)}</td>
+              <td className="py-2 pr-3">{e.channel}</td>
+              <td className="py-2 pr-3 whitespace-nowrap">{e.pretextCategory}</td>
+              <td className="py-2 pr-3 font-mono tabular-nums text-zinc-200">{e.compositeIndex}</td>
+              <td className="py-2 pr-3 font-mono tabular-nums">{e.urgency}</td>
+              <td className="py-2 pr-3 font-mono tabular-nums">{e.personalization}</td>
+              <td className="py-2 pr-3 font-mono tabular-nums">{e.ctaClarity}</td>
+              <td className="py-2 pr-3 whitespace-nowrap">{e.stage}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      {sorted.length > 200 && <p className="text-xs text-zinc-600 mt-2">Showing first 200 of {sorted.length} rows.</p>}
+    </div>
+  );
+}
+
+function CampaignPanel({ slot, campaign, draft, onDraftChange, onFiles, onAnalyze, onClear, onDownload, error, accent }) {
+  const count = campaign?.entries.length ?? 0;
+  return (
+    <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-4">
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          <span className={`w-2 h-2 rounded-full ${accent}`} />
+          <input
+            type="text"
+            value={draft.name}
+            onChange={(e) => onDraftChange({ ...draft, name: e.target.value })}
+            placeholder={`Campaign ${slot} name`}
+            className="bg-transparent text-xs font-semibold text-zinc-200 focus:outline-none w-40"
+          />
+        </div>
+        {count > 0 && (
+          <div className="flex items-center gap-3">
+            <button onClick={onDownload} className="flex items-center gap-1 text-xs text-zinc-400 hover:text-rose-300 transition-colors">
+              <Download className="w-3.5 h-3.5" /> Save
+            </button>
+            <button onClick={onClear} className="flex items-center gap-1 text-xs text-zinc-500 hover:text-red-400 transition-colors">
+              <X className="w-3.5 h-3.5" /> Clear
+            </button>
+          </div>
+        )}
+      </div>
+
+      <textarea
+        value={draft.text}
+        onChange={(e) => onDraftChange({ ...draft, text: e.target.value })}
+        rows={5}
+        placeholder={`Paste campaign ${slot} messages, separated by a line containing only ---`}
+        className="w-full bg-black/30 border border-white/10 focus:border-rose-500/50 focus:outline-none rounded-xl p-3 text-xs leading-relaxed text-zinc-200 placeholder-zinc-600 resize-y font-mono transition-colors"
+      />
+      <div className="mt-2">
+        <BatchDropzone onFiles={onFiles} hint={`Drop campaign ${slot} files (.txt / .csv / .json)`} />
+      </div>
+      {error && <p className="text-xs text-red-400 mt-2">{error}</p>}
+
+      <div className="flex items-center justify-between mt-3">
+        <span className="text-xs text-zinc-600">
+          {count > 0
+            ? `${count} messages · ${campaign.summary.channelMix.map((m) => `${m.count} ${m.key.toLowerCase()}`).join(' + ')}`
+            : 'No messages loaded'}
+        </span>
+        <button
+          onClick={onAnalyze}
+          className="px-4 py-1.5 rounded-xl text-xs font-semibold bg-white/5 hover:bg-white/10 text-zinc-200 transition-colors"
+        >
+          Score campaign {slot}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================
+   MAIN COMPONENT
+   ============================================================ */
+
 export default function HellhoundTerminal() {
+  const [mode, setMode] = useState('single');
+  const [now, setNow] = useState(null);
+
+  // Single sample
   const [inputText, setInputText] = useState('');
-  const [storyId, setStoryId] = useState('');
   const [channel, setChannel] = useState('Email');
   const [outcome, setOutcome] = useState('Unknown');
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [error, setError] = useState(null);
   const [result, setResult] = useState(null);
-  const [currentEntry, setCurrentEntry] = useState(null);
-  const [history, setHistory] = useState([]);
-  const [importError, setImportError] = useState(null);
-  const [now, setNow] = useState(null);
   const [displayIndex, setDisplayIndex] = useState(0);
 
-  // In-memory only — nothing here is written to disk or any storage API.
-  // Closing or reloading the tab clears everything. Use "Download" to keep
-  // a copy, and the drop zone below to bring prior exports back in.
+  // Corpus
+  const [corpusText, setCorpusText] = useState('');
+  const [corpusEntries, setCorpusEntries] = useState([]);
+  const [corpusError, setCorpusError] = useState(null);
+
+  // Campaign A/B
+  const [draftA, setDraftA] = useState({ name: 'Campaign A', text: '' });
+  const [draftB, setDraftB] = useState({ name: 'Campaign B', text: '' });
+  const [campaignA, setCampaignA] = useState(null);
+  const [campaignB, setCampaignB] = useState(null);
+  const [errorA, setErrorA] = useState(null);
+  const [errorB, setErrorB] = useState(null);
+
+  /* Everything above lives in React memory only. No localStorage, no
+     sessionStorage, no cookies, no server, no database. Reloading the tab
+     wipes it; downloads are the only way to keep anything. */
 
   useEffect(() => {
     setNow(new Date());
@@ -357,154 +583,111 @@ export default function HellhoundTerminal() {
     return () => clearInterval(iv);
   }, [result]);
 
-  const runSemanticAnalysis = useCallback(async (text) => {
-    const systemPrompt = `You are an objective text-analysis engine for security research. You analyze the given text sample only, for the psychological and persuasive techniques present. You never rewrite, improve, complete, or generate replacement or new manipulative content, and never produce content meant to be sent to anyone. Be extremely concise in every text field. Output ONLY this JSON schema, no markdown fences, no other text:
-{"composite_index": <0-100>, "pretext": {"category": "<one of: IT Support, HR, Finance, Executive, Vendor, Personal Emergency, Delivery, Other>", "specificity": <0-100>}, "cialdini": {"reciprocity": {"score": <0-100>, "evidence": "<=8 words or empty"}, "commitment_consistency": {"score": <0-100>, "evidence": "<=8 words"}, "social_proof": {"score": <0-100>, "evidence": "<=8 words"}, "authority": {"score": <0-100>, "evidence": "<=8 words"}, "liking": {"score": <0-100>, "evidence": "<=8 words"}, "scarcity": {"score": <0-100>, "evidence": "<=8 words"}, "unity": {"score": <0-100>, "evidence": "<=8 words"}}, "emotional_pressure": {"overall_pull": <0-100>, "trajectory": [{"stage": "opening", "emotion": "<1-2 words>", "intensity": <0-100>}, {"stage": "middle", "emotion": "<1-2 words>", "intensity": <0-100>}, {"stage": "close", "emotion": "<1-2 words>", "intensity": <0-100>}], "urgency_scarcity": <0-100>, "threat_benefit_ratio": <0-100, 0 is pure benefit framing, 100 is pure threat framing>}, "personalization": {"data_point_density": <0-100>, "source_likelihood": "<public|mixed|private>", "role_context_fit": <0-100>}, "linguistic": {"register_consistency": <0-100>, "cta_clarity": <0-100>, "cta_steps": <integer>, "surface_quality": <0-100>}, "cognitive_load": {"mental_demand": <0-100>, "temporal_demand": <0-100>, "effort_to_verify": <0-100>, "frustration_induced": <0-100>}, "attack_cycle_stage": "<Research|Hook|Trust|Exploit|Exit>", "attack_cycle_rationale": "<one short sentence>", "analyst_summary": "<2-3 objective clinical sentences>"}`;
+  /* ---------- single sample ---------- */
 
-    const resp = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-6',
-        max_tokens: 1000,
-        system: systemPrompt,
-        messages: [{ role: 'user', content: `Analyze this text sample:\n\n${text}` }]
-      })
-    });
-    if (!resp.ok) throw new Error(`API returned ${resp.status}`);
-    const data = await resp.json();
-    const textBlock = (data.content || []).find(b => b.type === 'text');
-    if (!textBlock) throw new Error('No analysis returned');
-    const clean = textBlock.text.replace(/```json|```/g, '').trim();
-    return JSON.parse(clean);
-  }, []);
-
-  const handleAnalyze = useCallback(async () => {
+  const handleAnalyze = useCallback(() => {
     const text = inputText.trim();
     if (!text) return;
-    setIsAnalyzing(true);
-    setError(null);
-    try {
-      const words = text.split(/\s+/).filter(Boolean);
-      const readability = computeReadability(text);
-      const passive = estimatePassiveVoice(text);
-      const lexicon = scanLexicon(text, words.length);
-      const semantic = await runSemanticAnalysis(text);
-      const merged = { timestamp: new Date().toISOString(), readability, passive, lexicon, semantic };
-      setResult(merged);
-
-      const entry = {
-        id: `${Date.now()}`,
-        timestamp: merged.timestamp,
-        preview: text.slice(0, 48),
-        compositeIndex: semantic.composite_index,
-        stage: semantic.attack_cycle_stage,
-        pretextCategory: semantic.pretext?.category || 'Other',
-        specificity: semantic.pretext?.specificity ?? null,
-        storyId: storyId.trim() || null,
-        channel,
-        outcome,
-        pressureScore: Math.round(((semantic.emotional_pressure?.overall_pull || 0) + (semantic.emotional_pressure?.urgency_scarcity || 0)) / 2),
-        personalizationScore: Math.round(((semantic.personalization?.data_point_density || 0) + (semantic.personalization?.role_context_fit || 0)) / 2),
-        registerConsistency: semantic.linguistic?.register_consistency || 0,
-        surfaceQuality: semantic.linguistic?.surface_quality || 0,
-        full: merged
-      };
-      setCurrentEntry(entry);
-      setHistory(prev => [entry, ...prev].slice(0, 200));
-    } catch (e) {
-      console.error(e);
-      setError(e.message || 'Analysis failed');
-    } finally {
-      setIsAnalyzing(false);
-    }
-  }, [inputText, storyId, channel, outcome, runSemanticAnalysis]);
+    setResult(analyzeText(text, { label: 'sample', channel, outcome }));
+  }, [inputText, channel, outcome]);
 
   const handleDownloadCurrent = useCallback(() => {
-    if (!currentEntry) return;
-    downloadJSON(currentEntry, `hellhound-analysis-${currentEntry.id}.json`);
-  }, [currentEntry]);
+    if (!result) return;
+    downloadJSON({ kind: 'hellhound-analysis', generatedAt: new Date().toISOString(), analysis: result }, `hellhound-analysis-${Date.now()}.json`);
+  }, [result]);
 
-  const handleExportSession = useCallback(() => {
-    downloadJSON({ exportedAt: new Date().toISOString(), entries: history }, `hellhound-session-${Date.now()}.json`);
-  }, [history]);
+  /* ---------- corpus ---------- */
 
-  const handleClearSession = useCallback(() => {
-    setHistory([]);
-    setResult(null);
-    setCurrentEntry(null);
+  const runCorpus = useCallback((messages) => {
+    const scored = analyzeCorpus(messages);
+    if (!scored.length) { setCorpusError('No readable messages found.'); return; }
+    setCorpusError(null);
+    setCorpusEntries(scored);
   }, []);
 
-  const handleImportFiles = useCallback(async (fileList) => {
-    setImportError(null);
-    const files = Array.from(fileList).filter(f => /\.json$/i.test(f.name) || f.type === 'application/json');
-    if (!files.length) { setImportError('Only .json files exported from Hellhound can be imported.'); return; }
-    let imported = [];
-    const badFiles = [];
-    for (const file of files) {
-      try {
-        const text = await file.text();
-        const parsed = JSON.parse(text);
-        if (Array.isArray(parsed.entries)) imported = imported.concat(parsed.entries);
-        else if (parsed && typeof parsed.compositeIndex === 'number') imported.push(parsed);
-        else badFiles.push(file.name);
-      } catch (e) {
-        badFiles.push(file.name);
-      }
-    }
-    if (badFiles.length) setImportError(`Could not read: ${badFiles.join(', ')}`);
-    if (imported.length) {
-      const normalized = imported.map(e => ({ ...e, id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}` }));
-      setHistory(prev => [...normalized, ...prev].slice(0, 200));
-    }
-  }, []);
+  const handleCorpusPaste = useCallback(() => {
+    const chunks = splitBatchText(corpusText);
+    if (!chunks.length) { setCorpusError('Paste at least one message.'); return; }
+    runCorpus(chunks.map((t, i) => ({ text: t, label: `pasted-${i + 1}` })));
+  }, [corpusText, runCorpus]);
+
+  const handleCorpusFiles = useCallback(async (fileList) => {
+    const { messages, failed } = await messagesFromFiles(fileList);
+    if (failed.length) setCorpusError(`Could not read: ${failed.join(', ')}`);
+    if (messages.length) runCorpus(messages);
+    else if (!failed.length) setCorpusError('No readable messages found.');
+  }, [runCorpus]);
+
+  const corpusSummary = useMemo(() => aggregateCorpus(corpusEntries), [corpusEntries]);
+
+  const handleDownloadCorpus = useCallback(() => {
+    if (!corpusEntries.length) return;
+    downloadJSON(
+      {
+        kind: 'hellhound-corpus',
+        generatedAt: new Date().toISOString(),
+        summary: corpusSummary,
+        messages: corpusEntries.map((e) => ({ label: e.label, channel: e.channel, outcome: e.outcome, text: e.sourceText }))
+      },
+      `hellhound-corpus-${Date.now()}.json`
+    );
+  }, [corpusEntries, corpusSummary]);
+
+  const handleSendCorpusTo = useCallback((slot) => {
+    if (!corpusEntries.length) return;
+    const campaign = buildCampaign(slot === 'A' ? draftA.name : draftB.name, corpusEntries);
+    if (slot === 'A') setCampaignA(campaign); else setCampaignB(campaign);
+    setMode('compare');
+  }, [corpusEntries, draftA.name, draftB.name]);
+
+  /* ---------- campaigns ---------- */
+
+  const scoreCampaign = useCallback((slot) => {
+    const draft = slot === 'A' ? draftA : draftB;
+    const setErr = slot === 'A' ? setErrorA : setErrorB;
+    const chunks = splitBatchText(draft.text);
+    if (!chunks.length) { setErr('Paste messages or drop files first.'); return; }
+    setErr(null);
+    const entries = analyzeCorpus(chunks.map((t, i) => ({ text: t, label: `${draft.name}-${i + 1}` })));
+    const campaign = buildCampaign(draft.name, entries);
+    if (slot === 'A') setCampaignA(campaign); else setCampaignB(campaign);
+  }, [draftA, draftB]);
+
+  const loadCampaignFiles = useCallback(async (slot, fileList) => {
+    const setErr = slot === 'A' ? setErrorA : setErrorB;
+    const draft = slot === 'A' ? draftA : draftB;
+    const { messages, failed } = await messagesFromFiles(fileList);
+    if (failed.length) setErr(`Could not read: ${failed.join(', ')}`);
+    if (!messages.length) return;
+    setErr(null);
+    const entries = analyzeCorpus(messages);
+    const campaign = buildCampaign(draft.name, entries);
+    if (slot === 'A') setCampaignA(campaign); else setCampaignB(campaign);
+  }, [draftA, draftB]);
+
+  const downloadCampaign = useCallback((slot) => {
+    const campaign = slot === 'A' ? campaignA : campaignB;
+    if (!campaign) return;
+    downloadJSON(
+      {
+        kind: 'hellhound-campaign',
+        name: campaign.name,
+        generatedAt: new Date().toISOString(),
+        summary: campaign.summary,
+        messages: campaign.entries.map((e) => ({ label: e.label, channel: e.channel, outcome: e.outcome, text: e.sourceText }))
+      },
+      `hellhound-campaign-${campaign.name.replace(/\s+/g, '-').toLowerCase()}.json`
+    );
+  }, [campaignA, campaignB]);
+
+  const comparison = useMemo(() => compareCampaigns(campaignA, campaignB), [campaignA, campaignB]);
+
+  /* ---------- derived (single) ---------- */
 
   const tier = result ? riskTier(result.semantic.composite_index) : null;
   const radarData = result
-    ? CIALDINI_KEYS.map(k => ({ principle: CIALDINI_LABELS[k], value: result.semantic?.cialdini?.[k]?.score ?? 0 }))
+    ? CIALDINI_KEYS.map((k) => ({ principle: CIALDINI_LABELS[k], value: result.semantic.cialdini[k].score }))
     : [];
-
-  const rollup = useMemo(() => {
-    if (!history.length) return null;
-    const avg = (key) => Math.round(history.reduce((s, h) => s + (h[key] || 0), 0) / history.length);
-    return { total: history.length, avgComposite: avg('compositeIndex'), avgRegister: avg('registerConsistency'), avgSurface: avg('surfaceQuality') };
-  }, [history]);
-
-  const pretextStats = useMemo(() => {
-    const map = {};
-    history.forEach(h => {
-      const cat = h.pretextCategory || 'Other';
-      if (!map[cat]) map[cat] = { count: 0, sumCombined: 0 };
-      map[cat].count += 1;
-      map[cat].sumCombined += ((h.pressureScore || 0) + (h.personalizationScore || 0)) / 2;
-    });
-    return Object.entries(map)
-      .map(([category, v]) => ({ category, count: v.count, avgCombined: Math.round(v.sumCombined / v.count) }))
-      .sort((a, b) => b.avgCombined - a.avgCombined);
-  }, [history]);
-
-  const storyThreads = useMemo(() => {
-    const map = {};
-    history.forEach(h => { if (h.storyId) { if (!map[h.storyId]) map[h.storyId] = []; map[h.storyId].push(h); } });
-    return Object.entries(map)
-      .filter(([, items]) => items.length > 1)
-      .map(([id, items]) => {
-        const sorted = [...items].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
-        const cats = new Set(sorted.map(i => i.pretextCategory));
-        return { id, items: sorted, consistent: cats.size <= 1 };
-      });
-  }, [history]);
-
-  const successCohort = useMemo(() => {
-    const succeeded = history.filter(h => h.outcome === 'Clicked' || h.outcome === 'Credentials Entered');
-    if (!succeeded.length) return null;
-    const avg = (key) => Math.round(succeeded.reduce((s, h) => s + (h[key] || 0), 0) / succeeded.length);
-    const catCounts = {};
-    succeeded.forEach(h => { const c = h.pretextCategory || 'Other'; catCounts[c] = (catCounts[c] || 0) + 1; });
-    const top = Object.entries(catCounts).sort((a, b) => b[1] - a[1])[0];
-    return { n: succeeded.length, avgPressure: avg('pressureScore'), avgPersonalization: avg('personalizationScore'), topPretext: top ? top[0] : '—' };
-  }, [history]);
-
   const ep = result?.semantic?.emotional_pressure;
   const pz = result?.semantic?.personalization;
   const lg = result?.semantic?.linguistic;
@@ -528,7 +711,7 @@ export default function HellhoundTerminal() {
 
       <div className="relative z-10 max-w-6xl mx-auto px-4 py-6 md:px-8 md:py-8">
         {/* HEADER */}
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center justify-between mb-5">
           <div className="flex items-center gap-3">
             <img
               src={LOGO_SRC}
@@ -538,266 +721,458 @@ export default function HellhoundTerminal() {
             />
             <div>
               <h1 className="text-xl font-bold tracking-tight text-zinc-50 leading-none">Hellhound</h1>
-              <p className="text-xs text-zinc-500 mt-1">Cognitive telemetry engine</p>
+              <p className="text-xs text-zinc-500 mt-1">Deterministic cognitive telemetry · offline rubric</p>
             </div>
           </div>
           <p className="text-xs text-zinc-500 font-mono tabular-nums">{now ? `${formatDate(now)} · ${formatClock(now)}` : '\u00a0'}</p>
         </div>
 
-        {/* INPUT */}
-        <Card className="mb-4">
-          <SectionLabel sub="Paste a message to score it — nothing here is rewritten or generated.">Sample input</SectionLabel>
-          <textarea
-            value={inputText}
-            onChange={(e) => setInputText(e.target.value)}
-            onKeyDown={(e) => { if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') handleAnalyze(); }}
-            rows={6}
-            placeholder="Paste sample text here..."
-            className="w-full bg-black/30 border border-white/10 focus:border-rose-500/50 focus:outline-none rounded-xl p-3 text-sm leading-relaxed text-zinc-200 placeholder-zinc-600 resize-y font-mono transition-colors"
-          />
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mt-3">
-            <input
-              type="text"
-              value={storyId}
-              onChange={(e) => setStoryId(e.target.value)}
-              placeholder="Story ID (optional)"
-              className={`${inputCls} col-span-2 sm:col-span-1`}
-            />
-            <select value={channel} onChange={(e) => setChannel(e.target.value)} className={inputCls}>
-              {CHANNELS.map(c => <option key={c} value={c}>{c}</option>)}
-            </select>
-            <select value={outcome} onChange={(e) => setOutcome(e.target.value)} className={inputCls}>
-              {OUTCOMES.map(o => <option key={o} value={o}>{o}</option>)}
-            </select>
-          </div>
-          <div className="flex items-center justify-between mt-4">
-            <span className="text-xs text-zinc-600 font-mono tabular-nums">{inputText.trim() ? inputText.trim().split(/\s+/).length : 0} words</span>
-            <button
-              onClick={handleAnalyze}
-              disabled={isAnalyzing || !inputText.trim()}
-              className="flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-rose-600 to-rose-500 hover:from-rose-500 hover:to-rose-400 disabled:from-white/5 disabled:to-white/5 disabled:text-zinc-600 text-white font-semibold text-xs rounded-xl transition-all shadow-lg shadow-rose-950/40"
-            >
-              {isAnalyzing ? (<><Loader2 className="w-3.5 h-3.5 animate-spin" /> Analyzing</>) : 'Run analysis'}
-            </button>
-          </div>
-        </Card>
+        {/* MODE SWITCH */}
+        <div className="flex items-center gap-1 mb-4 p-1 rounded-2xl bg-white/[0.03] border border-white/5 w-fit">
+          <ModeTab active={mode === 'single'} onClick={() => setMode('single')} icon={FileText}>Single sample</ModeTab>
+          <ModeTab active={mode === 'corpus'} onClick={() => setMode('corpus')} icon={Layers}>Corpus</ModeTab>
+          <ModeTab active={mode === 'compare'} onClick={() => setMode('compare')} icon={GitCompare}>Campaign A/B</ModeTab>
+        </div>
 
-        {/* ERROR */}
-        {error && (
-          <div className="border border-red-500/20 bg-red-500/5 rounded-2xl p-3 mb-4 flex items-start gap-2">
-            <AlertTriangle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
-            <p className="text-xs text-red-300">Analysis failed — {error}. Check connection and retry.</p>
-          </div>
-        )}
-
-        {/* EMPTY STATE */}
-        {!result && !isAnalyzing && !error && (
-          <div className="border border-dashed border-white/10 rounded-3xl p-8 text-center mb-4">
-            <p className="text-xs text-zinc-500">No sample analyzed yet — paste text above and run analysis.</p>
-          </div>
-        )}
-
-        {/* RESULTS */}
-        {result && tier && (
-          <div className="space-y-4 mb-4">
-            <div className="flex justify-end">
-              <button
-                onClick={handleDownloadCurrent}
-                className="flex items-center gap-1.5 text-xs text-zinc-400 hover:text-rose-300 transition-colors"
-              >
-                <Download className="w-3.5 h-3.5" /> Download this analysis
-              </button>
-            </div>
-
-            <Card watermark>
-              <div className="relative flex flex-col items-center py-2">
-                <SectionLabel>Manipulation index</SectionLabel>
-                <Gauge value={displayIndex} />
-                {result.semantic.pretext && (
-                  <span className="mt-4 text-xs px-4 py-1.5 rounded-full bg-white/5 border border-white/10 text-zinc-400">
-                    {result.semantic.pretext.category} · specificity {result.semantic.pretext.specificity}
-                  </span>
-                )}
+        {/* ============ SINGLE SAMPLE ============ */}
+        {mode === 'single' && (
+          <>
+            <Card className="mb-4">
+              <SectionLabel sub="Scored locally by a fixed rubric — no model, no network, identical output every run.">Sample input</SectionLabel>
+              <textarea
+                value={inputText}
+                onChange={(e) => setInputText(e.target.value)}
+                onKeyDown={(e) => { if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') handleAnalyze(); }}
+                rows={6}
+                placeholder="Paste sample text here..."
+                className="w-full bg-black/30 border border-white/10 focus:border-rose-500/50 focus:outline-none rounded-xl p-3 text-sm leading-relaxed text-zinc-200 placeholder-zinc-600 resize-y font-mono transition-colors"
+              />
+              <div className="grid grid-cols-2 gap-2 mt-3 sm:max-w-sm">
+                <select value={channel} onChange={(e) => setChannel(e.target.value)} className={inputCls}>
+                  {CHANNELS.map((c) => <option key={c} value={c}>{c}</option>)}
+                </select>
+                <select value={outcome} onChange={(e) => setOutcome(e.target.value)} className={inputCls}>
+                  {OUTCOMES.map((o) => <option key={o} value={o}>{o}</option>)}
+                </select>
+              </div>
+              <div className="flex items-center justify-between mt-4">
+                <span className="text-xs text-zinc-600 font-mono tabular-nums">{inputText.trim() ? inputText.trim().split(/\s+/).length : 0} words</span>
+                <button
+                  onClick={handleAnalyze}
+                  disabled={!inputText.trim()}
+                  className="flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-rose-600 to-rose-500 hover:from-rose-500 hover:to-rose-400 disabled:from-white/5 disabled:to-white/5 disabled:text-zinc-600 text-white font-semibold text-xs rounded-xl transition-all shadow-lg shadow-rose-950/40"
+                >
+                  Run analysis
+                </button>
               </div>
             </Card>
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              <Card>
-                <SectionLabel>Cialdini principles</SectionLabel>
-                <div className="h-56">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <RadarChart data={radarData} outerRadius="72%">
-                      <PolarGrid stroke="rgba(255,255,255,0.08)" />
-                      <PolarAngleAxis dataKey="principle" tick={{ fill: '#a1a1aa', fontSize: 10 }} />
-                      <PolarRadiusAxis domain={[0, 100]} tick={false} axisLine={false} />
-                      <Radar dataKey="value" stroke="#fb7185" fill="#fb7185" fillOpacity={0.22} strokeWidth={2} />
-                    </RadarChart>
-                  </ResponsiveContainer>
-                </div>
-              </Card>
-              <Card>
-                <SectionLabel>Emotional pressure</SectionLabel>
-                <MeterBar label="Overall pull" value={ep?.overall_pull ?? 0} />
-                <MeterBar label="Urgency / scarcity" value={ep?.urgency_scarcity ?? 0} />
-                <MeterBar label="Threat-vs-benefit framing" value={ep?.threat_benefit_ratio ?? 0} />
-                <p className="text-xs text-zinc-600 -mt-2 mb-3">
-                  {(ep?.threat_benefit_ratio ?? 0) >= 50 ? 'Leans threat / loss framing' : 'Leans benefit / reward framing'}
-                </p>
-                <TrajectorySpark trajectory={ep?.trajectory} />
-              </Card>
-            </div>
-
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              <Card>
-                <SectionLabel>Personalization &amp; construction</SectionLabel>
-                <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs mb-4">
-                  <span className="text-zinc-500">Data-point density</span><span className="text-right font-mono tabular-nums text-zinc-200">{pz?.data_point_density ?? 0}</span>
-                  <span className="text-zinc-500">Likely source</span><span className="text-right text-zinc-200 capitalize">{pz?.source_likelihood ?? '—'}</span>
-                  <span className="text-zinc-500">Role / context fit</span><span className="text-right font-mono tabular-nums text-zinc-200">{pz?.role_context_fit ?? 0}</span>
-                </div>
-                <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs pt-4 border-t border-white/5">
-                  <span className="text-zinc-500">Register consistency</span><span className="text-right font-mono tabular-nums text-zinc-200">{lg?.register_consistency ?? 0}</span>
-                  <span className="text-zinc-500">CTA clarity</span><span className="text-right font-mono tabular-nums text-zinc-200">{lg?.cta_clarity ?? 0}</span>
-                  <span className="text-zinc-500">Requested actions</span><span className="text-right font-mono tabular-nums text-zinc-200">{lg?.cta_steps ?? 0}</span>
-                  <span className="text-zinc-500">Surface quality</span><span className="text-right font-mono tabular-nums text-zinc-200">{lg?.surface_quality ?? 0}</span>
-                </div>
-              </Card>
-              <Card>
-                <SectionLabel>Reader burden</SectionLabel>
-                {TLX_DIMS.map(d => <MeterBar key={d.key} label={d.label} value={cl?.[d.key] ?? 0} />)}
-                <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs mt-4 pt-4 border-t border-white/5">
-                  <span className="text-zinc-500">Grade level</span><span className="text-right font-mono tabular-nums text-zinc-200">{result.readability.fkGrade}</span>
-                  <span className="text-zinc-500">Reading ease</span><span className="text-right font-mono tabular-nums text-zinc-200">{result.readability.fleschEase}</span>
-                  <span className="text-zinc-500">Passive voice</span><span className="text-right font-mono tabular-nums text-zinc-200">{result.passive}%</span>
-                  <span className="text-zinc-500">Words / sentences</span><span className="text-right font-mono tabular-nums text-zinc-200">{result.readability.wordCount} / {result.readability.sentenceCount}</span>
-                </div>
-              </Card>
-            </div>
-
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              <Card>
-                <SectionLabel>Attack cycle stage</SectionLabel>
-                <AttackCycleStepper stage={result.semantic.attack_cycle_stage} />
-                <p className="text-xs text-zinc-400 mt-4 leading-relaxed">{result.semantic.attack_cycle_rationale}</p>
-              </Card>
-              <Card>
-                <SectionLabel>Lexical markers</SectionLabel>
-                {Object.entries(result.lexicon).map(([cat, data]) => (
-                  <div key={cat}>
-                    <MeterBar label={LEXICON_LABELS[cat]} value={data.density} suffix=" /1k" pct={Math.min(100, data.density * 4)} colorClass={data.hits.length ? 'rose' : 'emerald'} />
-                    {data.hits.length > 0 && <p className="text-xs text-zinc-600 -mt-2 mb-3 truncate">e.g. {data.hits.slice(0, 4).join(', ')}</p>}
-                  </div>
-                ))}
-              </Card>
-            </div>
-
-            <Card>
-              <SectionLabel>Analyst summary</SectionLabel>
-              <p className="text-sm text-zinc-300 leading-relaxed">{result.semantic.analyst_summary}</p>
-            </Card>
-          </div>
-        )}
-
-        {/* CAMPAIGN REVIEW */}
-        <Card>
-          <div className="flex items-start justify-between mb-4">
-            <SectionLabel sub="Reflects this session's runs plus anything you drop in below — nothing is saved automatically.">Campaign review</SectionLabel>
-            {history.length > 0 && (
-              <div className="flex items-center gap-3 shrink-0">
-                <button onClick={handleExportSession} className="flex items-center gap-1.5 text-xs text-zinc-400 hover:text-rose-300 transition-colors">
-                  <Download className="w-3.5 h-3.5" /> Export session
-                </button>
-                <button onClick={handleClearSession} className="flex items-center gap-1.5 text-xs text-zinc-500 hover:text-red-400 transition-colors">
-                  <X className="w-3.5 h-3.5" /> Clear
-                </button>
+            {!result && (
+              <div className="border border-dashed border-white/10 rounded-3xl p-8 text-center mb-4">
+                <p className="text-xs text-zinc-500">No sample analyzed yet — paste text above and run analysis.</p>
               </div>
             )}
-          </div>
 
-          <ImportDropzone onFiles={handleImportFiles} />
-          {importError && <p className="text-xs text-red-400 mt-2">{importError}</p>}
+            {result && tier && (
+              <div className="space-y-4 mb-4">
+                <div className="flex justify-end">
+                  <button onClick={handleDownloadCurrent} className="flex items-center gap-1.5 text-xs text-zinc-400 hover:text-rose-300 transition-colors">
+                    <Download className="w-3.5 h-3.5" /> Download this analysis
+                  </button>
+                </div>
 
-          {!rollup ? (
-            <p className="text-xs text-zinc-600 mt-5">No samples logged yet.</p>
-          ) : (
-            <>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-5 mb-5">
-                <StatChip label="Samples" value={rollup.total} />
-                <StatChip label="Avg index" value={rollup.avgComposite} />
-                <StatChip label="Avg register" value={rollup.avgRegister} />
-                <StatChip label="Avg surface quality" value={rollup.avgSurface} />
-              </div>
+                <Card watermark>
+                  <div className="relative flex flex-col items-center py-2">
+                    <SectionLabel>Manipulation index</SectionLabel>
+                    <Gauge value={displayIndex} />
+                    <span className="mt-4 text-xs px-4 py-1.5 rounded-full bg-white/5 border border-white/10 text-zinc-300">
+                      {result.semantic.pretext.category} · specificity {result.semantic.pretext.specificity}
+                    </span>
+                  </div>
+                </Card>
 
-              {pretextStats.length > 0 && (
-                <div className="mb-5">
-                  <p className="text-xs text-zinc-500 mb-2">Pretexts, by combined pressure + personalization</p>
-                  <div className="space-y-2">
-                    {pretextStats.map(p => (
-                      <div key={p.category} className="flex items-center gap-3 text-xs">
-                        <span className="w-28 truncate text-zinc-300">{p.category}</span>
-                        <div className="flex-1 h-1.5 bg-white/5 rounded-full overflow-hidden">
-                          <div className="h-full rounded-full bg-gradient-to-r from-rose-600 to-rose-400" style={{ width: `${p.avgCombined}%` }} />
-                        </div>
-                        <span className="w-7 text-right text-zinc-500 font-mono tabular-nums">×{p.count}</span>
+                <Card>
+                  <SectionLabel sub="Fixed weights — the composite is a weighted sum of these five measured components.">Rubric breakdown</SectionLabel>
+                  {COMPOSITE_WEIGHTS.map((w) => (
+                    <MeterBar
+                      key={w.key}
+                      label={`${w.label} · weight ${Math.round(w.weight * 100)}%`}
+                      value={result.semantic.components[w.key]}
+                    />
+                  ))}
+                </Card>
+
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                  <Card>
+                    <SectionLabel>Cialdini principles</SectionLabel>
+                    <div className="h-56">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <RadarChart data={radarData} outerRadius="72%">
+                          <PolarGrid stroke="rgba(255,255,255,0.08)" />
+                          <PolarAngleAxis dataKey="principle" tick={{ fill: '#a1a1aa', fontSize: 10 }} />
+                          <PolarRadiusAxis domain={[0, 100]} tick={false} axisLine={false} />
+                          <Radar dataKey="value" stroke="#fb7185" fill="#fb7185" fillOpacity={0.22} strokeWidth={2} />
+                        </RadarChart>
+                      </ResponsiveContainer>
+                    </div>
+                    <div className="space-y-1 mt-2">
+                      {CIALDINI_KEYS.filter((k) => result.semantic.cialdini[k].evidence).map((k) => (
+                        <p key={k} className="text-xs text-zinc-600 truncate">
+                          <span className="text-zinc-400">{CIALDINI_LABELS[k]}</span> — matched: {result.semantic.cialdini[k].evidence}
+                        </p>
+                      ))}
+                    </div>
+                  </Card>
+                  <Card>
+                    <SectionLabel>Emotional pressure</SectionLabel>
+                    <MeterBar label="Overall pull" value={ep.overall_pull} />
+                    <MeterBar label="Urgency / scarcity" value={ep.urgency_scarcity} />
+                    <MeterBar label="Threat-vs-benefit framing" value={ep.threat_benefit_ratio} />
+                    <p className="text-xs text-zinc-600 -mt-2 mb-3">
+                      {ep.threat_benefit_ratio >= 50 ? 'Leans threat / loss framing' : 'Leans benefit / reward framing'}
+                    </p>
+                    <TrajectorySpark trajectory={ep.trajectory} />
+                  </Card>
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                  <Card>
+                    <SectionLabel>Personalization &amp; construction</SectionLabel>
+                    <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs mb-4">
+                      <span className="text-zinc-500">Data-point density</span><span className="text-right font-mono tabular-nums text-zinc-200">{pz.data_point_density}</span>
+                      <span className="text-zinc-500">Likely source</span><span className="text-right text-zinc-200 capitalize">{pz.source_likelihood}</span>
+                      <span className="text-zinc-500">Role / context fit</span><span className="text-right font-mono tabular-nums text-zinc-200">{pz.role_context_fit}</span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs pt-4 border-t border-white/5">
+                      <span className="text-zinc-500">Register consistency</span><span className="text-right font-mono tabular-nums text-zinc-200">{lg.register_consistency}</span>
+                      <span className="text-zinc-500">CTA clarity</span><span className="text-right font-mono tabular-nums text-zinc-200">{lg.cta_clarity}</span>
+                      <span className="text-zinc-500">Requested actions</span><span className="text-right font-mono tabular-nums text-zinc-200">{lg.cta_steps}</span>
+                      <span className="text-zinc-500">Surface quality</span><span className="text-right font-mono tabular-nums text-zinc-200">{lg.surface_quality}</span>
+                    </div>
+                  </Card>
+                  <Card>
+                    <SectionLabel>Reader burden</SectionLabel>
+                    {TLX_DIMS.map((d) => <MeterBar key={d.key} label={d.label} value={cl[d.key]} />)}
+                    <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs mt-4 pt-4 border-t border-white/5">
+                      <span className="text-zinc-500">Grade level</span><span className="text-right font-mono tabular-nums text-zinc-200">{result.readability.fkGrade}</span>
+                      <span className="text-zinc-500">Reading ease</span><span className="text-right font-mono tabular-nums text-zinc-200">{result.readability.fleschEase}</span>
+                      <span className="text-zinc-500">Passive voice</span><span className="text-right font-mono tabular-nums text-zinc-200">{result.passive}%</span>
+                      <span className="text-zinc-500">Words / sentences</span><span className="text-right font-mono tabular-nums text-zinc-200">{result.readability.wordCount} / {result.readability.sentenceCount}</span>
+                    </div>
+                  </Card>
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                  <Card>
+                    <SectionLabel>Attack cycle stage</SectionLabel>
+                    <AttackCycleStepper stage={result.semantic.attack_cycle_stage} />
+                    <p className="text-xs text-zinc-400 mt-4 leading-relaxed">{result.semantic.attack_cycle_rationale}</p>
+                  </Card>
+                  <Card>
+                    <SectionLabel>Lexical markers</SectionLabel>
+                    {Object.entries(result.lexicon).map(([cat, data]) => (
+                      <div key={cat}>
+                        <MeterBar label={LEXICON_LABELS[cat]} value={data.density} suffix=" /1k" pct={Math.min(100, data.density * 4)} colorClass={data.hits.length ? 'rose' : 'emerald'} />
+                        {data.hits.length > 0 && <p className="text-xs text-zinc-600 -mt-2 mb-3 truncate">e.g. {data.hits.slice(0, 4).join(', ')}</p>}
                       </div>
                     ))}
-                  </div>
+                  </Card>
                 </div>
-              )}
 
-              {successCohort && (
-                <div className="mb-5 p-3 rounded-2xl bg-red-500/5 border border-red-500/10">
-                  <p className="text-xs text-red-300 mb-1">Succeeded against you ({successCohort.n})</p>
-                  <p className="text-xs text-zinc-400">Most common pretext: {successCohort.topPretext} · avg pressure {successCohort.avgPressure} · avg personalization {successCohort.avgPersonalization}</p>
-                </div>
-              )}
-
-              {storyThreads.length > 0 && (
-                <div className="mb-2">
-                  <p className="text-xs text-zinc-500 mb-2">Multi-touch threads</p>
-                  {storyThreads.map(t => (
-                    <div key={t.id} className="mb-3 last:mb-0">
-                      <div className="flex items-center gap-2 text-xs mb-1.5">
-                        <span className="text-zinc-300">{t.id}</span>
-                        <span className={`text-xs px-2 py-0.5 rounded-full ${t.consistent ? 'bg-emerald-500/10 text-emerald-400' : 'bg-red-500/10 text-red-400'}`}>
-                          {t.consistent ? 'consistent' : 'pretext drift'}
-                        </span>
-                      </div>
-                      <div className="flex gap-2 flex-wrap">
-                        {t.items.map(it => (
-                          <span key={it.id} className="text-xs text-zinc-500 bg-white/5 px-2 py-1 rounded-lg font-mono">{it.channel} · {it.compositeIndex}</span>
-                        ))}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </>
-          )}
-
-          <div className="mt-5 pt-4 border-t border-white/5">
-            <p className="text-xs text-zinc-500 mb-2">Log</p>
-            {history.length === 0 ? (
-              <p className="text-xs text-zinc-600">No prior sessions.</p>
-            ) : (
-              <div className="divide-y divide-white/5">
-                {history.map(h => {
-                  const t = riskTier(h.compositeIndex);
-                  const scoreClass = `w-9 text-right font-semibold font-mono tabular-nums text-${t.color}-400`;
-                  return (
-                    <div key={h.id} className="flex items-center justify-between py-2 text-xs gap-2">
-                      <span className="text-zinc-600 w-14 shrink-0 font-mono tabular-nums">{new Date(h.timestamp).toLocaleTimeString('en-US', { hour12: false })}</span>
-                      <span className="flex-1 truncate text-zinc-400">{h.preview || '(empty)'}</span>
-                      <span className="text-zinc-600 hidden sm:inline w-24 text-right truncate">{h.pretextCategory || '—'}</span>
-                      <span className={scoreClass}>{h.compositeIndex}</span>
-                    </div>
-                  );
-                })}
+                <Card>
+                  <SectionLabel>Analyst summary</SectionLabel>
+                  <p className="text-sm text-zinc-300 leading-relaxed">{result.semantic.analyst_summary}</p>
+                </Card>
               </div>
             )}
+          </>
+        )}
+
+        {/* ============ CORPUS ============ */}
+        {mode === 'corpus' && (
+          <div className="space-y-4">
+            <Card>
+              <SectionLabel sub="Drop in a whole set — e.g. 100 emails — and score every message with the same rubric to find the patterns across them.">Corpus input</SectionLabel>
+              <textarea
+                value={corpusText}
+                onChange={(e) => setCorpusText(e.target.value)}
+                rows={7}
+                placeholder={'Paste many messages, separated by a line containing only ---\n\nSubject: Password expiry\n...\n---\nSubject: Invoice overdue\n...'}
+                className="w-full bg-black/30 border border-white/10 focus:border-rose-500/50 focus:outline-none rounded-xl p-3 text-xs leading-relaxed text-zinc-200 placeholder-zinc-600 resize-y font-mono transition-colors"
+              />
+              <div className="mt-3">
+                <BatchDropzone onFiles={handleCorpusFiles} hint="Drop .txt / .csv / .json message files (CSV columns: text, channel, outcome, label)" />
+              </div>
+              {corpusError && (
+                <div className="border border-red-500/20 bg-red-500/5 rounded-2xl p-3 mt-3 flex items-start gap-2">
+                  <AlertTriangle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
+                  <p className="text-xs text-red-300">{corpusError}</p>
+                </div>
+              )}
+              <div className="flex items-center justify-between mt-4">
+                <span className="text-xs text-zinc-600 font-mono tabular-nums">{splitBatchText(corpusText).length} pasted messages</span>
+                <button
+                  onClick={handleCorpusPaste}
+                  className="px-6 py-2.5 bg-gradient-to-r from-rose-600 to-rose-500 hover:from-rose-500 hover:to-rose-400 text-white font-semibold text-xs rounded-xl transition-all shadow-lg shadow-rose-950/40"
+                >
+                  Score corpus
+                </button>
+              </div>
+            </Card>
+
+            {!corpusSummary ? (
+              <div className="border border-dashed border-white/10 rounded-3xl p-8 text-center">
+                <p className="text-xs text-zinc-500">No corpus scored yet — paste or drop a batch above.</p>
+              </div>
+            ) : (
+              <>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <button onClick={() => handleSendCorpusTo('A')} className="text-xs text-zinc-400 hover:text-rose-300 transition-colors">Send to campaign A</button>
+                    <button onClick={() => handleSendCorpusTo('B')} className="text-xs text-zinc-400 hover:text-rose-300 transition-colors">Send to campaign B</button>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <button onClick={handleDownloadCorpus} className="flex items-center gap-1.5 text-xs text-zinc-400 hover:text-rose-300 transition-colors">
+                      <Download className="w-3.5 h-3.5" /> Download corpus
+                    </button>
+                    <button onClick={() => { setCorpusEntries([]); setCorpusError(null); }} className="flex items-center gap-1.5 text-xs text-zinc-500 hover:text-red-400 transition-colors">
+                      <X className="w-3.5 h-3.5" /> Clear
+                    </button>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  <StatChip label="Messages" value={corpusSummary.count} />
+                  <StatChip label="Mean index" value={corpusSummary.stats.compositeIndex.mean} />
+                  <StatChip label="Median index" value={corpusSummary.stats.compositeIndex.median} />
+                  <StatChip label="Spread (σ)" value={corpusSummary.stats.compositeIndex.stdev} />
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                  <Card watermark>
+                    <SectionLabel>Index distribution</SectionLabel>
+                    <DistributionHistogram buckets={corpusSummary.buckets} />
+                  </Card>
+                  <Card>
+                    <SectionLabel>Corpus profile</SectionLabel>
+                    <div className="h-56">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <RadarChart
+                          data={DIMENSIONS.filter((d) => d.key !== 'readingGrade' && d.key !== 'compositeIndex').map((d) => ({
+                            dimension: d.label,
+                            value: corpusSummary.stats[d.key].mean
+                          }))}
+                          outerRadius="70%"
+                        >
+                          <PolarGrid stroke="rgba(255,255,255,0.08)" />
+                          <PolarAngleAxis dataKey="dimension" tick={{ fill: '#a1a1aa', fontSize: 9 }} />
+                          <PolarRadiusAxis domain={[0, 100]} tick={false} axisLine={false} />
+                          <Radar dataKey="value" stroke="#fb7185" fill="#fb7185" fillOpacity={0.22} strokeWidth={2} />
+                        </RadarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </Card>
+                </div>
+
+                <Card>
+                  <SectionLabel sub="Every statement below is derived by rule from the counted features — nothing is generated.">Cross-message findings</SectionLabel>
+                  <ul className="space-y-2">
+                    {corpusSummary.findings.map((f, i) => (
+                      <li key={i} className="text-xs text-zinc-300 leading-relaxed flex gap-2">
+                        <span className="text-rose-400 shrink-0">›</span>{f}
+                      </li>
+                    ))}
+                  </ul>
+                </Card>
+
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                  <Card>
+                    <SectionLabel>Dimension statistics</SectionLabel>
+                    <div className="space-y-1">
+                      {DIMENSIONS.map((d) => {
+                        const s = corpusSummary.stats[d.key];
+                        return (
+                          <div key={d.key} className="grid grid-cols-[1fr_3rem_3rem_4rem] gap-2 text-xs py-1 border-b border-white/5 last:border-0">
+                            <span className="text-zinc-400 truncate">{d.label}</span>
+                            <span className="text-right font-mono tabular-nums text-zinc-200">{s.mean}</span>
+                            <span className="text-right font-mono tabular-nums text-zinc-500">{s.median}</span>
+                            <span className="text-right font-mono tabular-nums text-zinc-600">σ {s.stdev}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    <p className="text-xs text-zinc-600 mt-2">Columns: mean · median · standard deviation</p>
+                  </Card>
+                  <div className="space-y-4">
+                    <Card>
+                      <SectionLabel>Pretext mix</SectionLabel>
+                      <MixBars items={corpusSummary.pretextMix} total={corpusSummary.count} />
+                    </Card>
+                    <Card>
+                      <SectionLabel>Channel &amp; stage mix</SectionLabel>
+                      <MixBars items={corpusSummary.channelMix} total={corpusSummary.count} />
+                      <div className="h-3" />
+                      <MixBars items={corpusSummary.stageMix} total={corpusSummary.count} />
+                    </Card>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                  <Card>
+                    <SectionLabel>Most frequent triggers</SectionLabel>
+                    <div className="flex flex-wrap gap-2">
+                      {corpusSummary.topTriggers.map((t) => (
+                        <span key={t.term} className="text-xs px-2.5 py-1 rounded-lg bg-white/5 border border-white/5 text-zinc-300">
+                          {t.term} <span className="text-zinc-600 font-mono">×{t.count}</span>
+                        </span>
+                      ))}
+                      {!corpusSummary.topTriggers.length && <p className="text-xs text-zinc-600">No lexicon markers matched.</p>}
+                    </div>
+                    {corpusSummary.phrases.length > 0 && (
+                      <>
+                        <p className="text-xs text-zinc-500 mt-5 mb-2">Repeated phrasing across messages</p>
+                        <div className="space-y-1">
+                          {corpusSummary.phrases.map((p) => (
+                            <p key={p.phrase} className="text-xs text-zinc-400 truncate">
+                              "{p.phrase}" <span className="text-zinc-600 font-mono">×{p.count}</span>
+                            </p>
+                          ))}
+                        </div>
+                      </>
+                    )}
+                  </Card>
+                  <Card>
+                    <SectionLabel>Outliers</SectionLabel>
+                    <div className="space-y-3 text-xs">
+                      {[
+                        ['Highest index', corpusSummary.outliers.highest, 'compositeIndex'],
+                        ['Lowest index', corpusSummary.outliers.lowest, 'compositeIndex'],
+                        ['Most personalized', corpusSummary.outliers.mostPersonalized, 'personalization'],
+                        ['Most urgent', corpusSummary.outliers.mostUrgent, 'urgency']
+                      ].map(([label, entry, key]) => (
+                        <div key={label} className="pb-2 border-b border-white/5 last:border-0">
+                          <div className="flex justify-between">
+                            <span className="text-zinc-500">{label}</span>
+                            <span className="font-mono tabular-nums text-zinc-200">{entry[key]}</span>
+                          </div>
+                          <p className="text-zinc-500 truncate mt-0.5">{entry.label} — {entry.excerpt}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </Card>
+                </div>
+
+                <Card>
+                  <SectionLabel sub="Click a column to sort. Held in memory only.">Per-message scores</SectionLabel>
+                  <CorpusTable entries={corpusEntries} />
+                </Card>
+              </>
+            )}
           </div>
-        </Card>
+        )}
+
+        {/* ============ CAMPAIGN A/B ============ */}
+        {mode === 'compare' && (
+          <div className="space-y-4">
+            <Card>
+              <SectionLabel sub="Load two whole campaigns — any mix of channels and volumes — and compare their construction against each other.">Campaign comparison</SectionLabel>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <CampaignPanel
+                  slot="A"
+                  accent="bg-sky-400"
+                  campaign={campaignA}
+                  draft={draftA}
+                  onDraftChange={setDraftA}
+                  onFiles={(f) => loadCampaignFiles('A', f)}
+                  onAnalyze={() => scoreCampaign('A')}
+                  onClear={() => setCampaignA(null)}
+                  onDownload={() => downloadCampaign('A')}
+                  error={errorA}
+                />
+                <CampaignPanel
+                  slot="B"
+                  accent="bg-rose-400"
+                  campaign={campaignB}
+                  draft={draftB}
+                  onDraftChange={setDraftB}
+                  onFiles={(f) => loadCampaignFiles('B', f)}
+                  onAnalyze={() => scoreCampaign('B')}
+                  onClear={() => setCampaignB(null)}
+                  onDownload={() => downloadCampaign('B')}
+                  error={errorB}
+                />
+              </div>
+            </Card>
+
+            {!comparison ? (
+              <div className="border border-dashed border-white/10 rounded-3xl p-8 text-center">
+                <p className="text-xs text-zinc-500">Load and score both campaigns to see the comparison.</p>
+              </div>
+            ) : (
+              <>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  <StatChip label={`${campaignA.name} messages`} value={campaignA.entries.length} />
+                  <StatChip label={`${campaignA.name} mean index`} value={campaignA.summary.stats.compositeIndex.mean} />
+                  <StatChip label={`${campaignB.name} messages`} value={campaignB.entries.length} />
+                  <StatChip label={`${campaignB.name} mean index`} value={campaignB.summary.stats.compositeIndex.mean} />
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                  <Card watermark>
+                    <SectionLabel sub={`${campaignA.name} in blue · ${campaignB.name} in crimson`}>Paired profile</SectionLabel>
+                    <div className="h-64">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <RadarChart data={comparison.radar} outerRadius="70%">
+                          <PolarGrid stroke="rgba(255,255,255,0.08)" />
+                          <PolarAngleAxis dataKey="dimension" tick={{ fill: '#a1a1aa', fontSize: 9 }} />
+                          <PolarRadiusAxis domain={[0, 100]} tick={false} axisLine={false} />
+                          <Radar name={campaignA.name} dataKey="A" stroke="#38bdf8" fill="#38bdf8" fillOpacity={0.16} strokeWidth={2} />
+                          <Radar name={campaignB.name} dataKey="B" stroke="#fb7185" fill="#fb7185" fillOpacity={0.16} strokeWidth={2} />
+                        </RadarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </Card>
+                  <Card>
+                    <SectionLabel sub={`Left bar favours ${campaignA.name}, right bar favours ${campaignB.name}`}>Per-dimension delta</SectionLabel>
+                    {comparison.deltas.map((d) => (
+                      <DeltaRow key={d.key} row={d} nameA={campaignA.name} nameB={campaignB.name} />
+                    ))}
+                  </Card>
+                </div>
+
+                <Card>
+                  <SectionLabel>Comparison findings</SectionLabel>
+                  <ul className="space-y-2">
+                    {comparison.findings.map((f, i) => (
+                      <li key={i} className="text-xs text-zinc-300 leading-relaxed flex gap-2">
+                        <span className="text-rose-400 shrink-0">›</span>{f}
+                      </li>
+                    ))}
+                  </ul>
+                </Card>
+
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                  {[campaignA, campaignB].map((c, i) => (
+                    <Card key={i}>
+                      <SectionLabel sub={`${c.entries.length} messages`}>{c.name}</SectionLabel>
+                      <p className="text-xs text-zinc-500 mb-2">Channel mix</p>
+                      <MixBars items={c.summary.channelMix} total={c.entries.length} />
+                      <p className="text-xs text-zinc-500 mt-4 mb-2">Pretext mix</p>
+                      <MixBars items={c.summary.pretextMix} total={c.entries.length} />
+                    </Card>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+        )}
+
+        <p className="text-xs text-zinc-600 mt-6 text-center">
+          Nothing is stored. No accounts, no database, no localStorage, no network calls — everything is scored in your browser and
+          disappears on reload. Use the download buttons to keep a copy, and drop those files back in to continue.
+        </p>
       </div>
     </div>
   );
 }
+
