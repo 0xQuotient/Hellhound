@@ -540,7 +540,7 @@ export default function HellhoundTerminal() {
               <p className="text-xs text-zinc-500 mt-1">Cognitive telemetry engine</p>
             </div>
           </div>
-          <p className="text-xs text-zinc-500 font-mono tabular-nums">{formatDate(now)} · {formatClock(now)}</p>
+          <p className="text-xs text-zinc-500 font-mono tabular-nums">{now ? `${formatDate(now)} · ${formatClock(now)}` : '\u00a0'}</p>
         </div>
 
         {/* INPUT */}
