@@ -329,7 +329,7 @@ export default function HellhoundTerminal() {
   const [currentEntry, setCurrentEntry] = useState(null);
   const [history, setHistory] = useState([]);
   const [importError, setImportError] = useState(null);
-  const [now, setNow] = useState(new Date());
+  const [now, setNow] = useState(null);
   const [displayIndex, setDisplayIndex] = useState(0);
 
   // In-memory only — nothing here is written to disk or any storage API.
