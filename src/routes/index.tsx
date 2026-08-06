@@ -1,5 +1,4 @@
 import { createFileRoute } from "@tanstack/react-router";
-// @ts-expect-error - JSX module without type declarations
 import HellhoundTerminal from "@/components/HellhoundTerminal.jsx";
 
 export const Route = createFileRoute("/")({
