@@ -1,6 +1,26 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, ResponsiveContainer } from 'recharts';
-import { AlertTriangle, Loader2, Download, Upload, X } from 'lucide-react';
+import { AlertTriangle, Download, Upload, X, FileText, Layers, GitCompare } from 'lucide-react';
+import {
+  LEXICON_LABELS,
+  CIALDINI_KEYS,
+  CIALDINI_LABELS,
+  ATTACK_STAGES,
+  TLX_DIMS,
+  CHANNELS,
+  OUTCOMES,
+  COMPOSITE_WEIGHTS,
+  DIMENSIONS,
+  riskTier,
+  analyzeText,
+  analyzeCorpus,
+  aggregateCorpus,
+  splitBatchText,
+  messagesFromFiles,
+  buildCampaign,
+  compareCampaigns
+} from '@/lib/hellhound-scoring';
+
 
 /* ============================================================
    FILE HELPERS (client-side only — nothing here calls a server)
