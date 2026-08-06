@@ -1,6 +1,8 @@
 @import "tailwindcss" source(none);
-@source "../src";
 @import "tw-animate-css";
+@source "../src";
+@source inline("{text,bg,from,to,border}-{rose,emerald,amber,red}-{300,400,500,600}");
+
 
 @custom-variant dark (&:is(.dark *));
 
