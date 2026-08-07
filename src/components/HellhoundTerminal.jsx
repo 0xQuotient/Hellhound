@@ -7,7 +7,17 @@ import {
   Radar,
   ResponsiveContainer,
 } from "recharts";
-import { AlertTriangle, Download, Upload, X, FileText, Layers, GitCompare } from "lucide-react";
+import {
+  AlertTriangle,
+  Download,
+  Upload,
+  X,
+  FileText,
+  Layers,
+  GitCompare,
+  Plus,
+  Trash2,
+} from "lucide-react";
 import {
   LEXICON_LABELS,
   CIALDINI_KEYS,
@@ -18,15 +28,18 @@ import {
   OUTCOMES,
   COMPOSITE_WEIGHTS,
   DIMENSIONS,
+  CAMPAIGN_COLORS,
   riskTier,
   analyzeText,
   analyzeCorpus,
+  analyzeCorpusAsync,
+  ingestFiles,
   aggregateCorpus,
   splitBatchText,
-  messagesFromFiles,
   buildCampaign,
   compareCampaigns,
 } from "@/lib/hellhound-scoring";
+
 
 /* ============================================================
    FILE HELPERS (client-side only — nothing here calls a server)
