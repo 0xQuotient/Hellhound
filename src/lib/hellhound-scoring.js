@@ -1268,12 +1268,17 @@ function tally(items, keyFn) {
     .sort((a, b) => b.count - a.count);
 }
 
+const PHRASE_WORD_CAP = 120; // words inspected per message
+const PHRASE_MAP_CAP = 120_000; // distinct phrases tracked at once
+const PHRASE_SAMPLE_CAP = 5000; // messages sampled for phrase detection
+
 function shingles(text, n = 5) {
   const words = text
     .toLowerCase()
     .replace(/[^a-z0-9\s]/g, " ")
     .split(/\s+/)
-    .filter(Boolean);
+    .filter(Boolean)
+    .slice(0, PHRASE_WORD_CAP);
   const out = new Set();
   for (let i = 0; i + n <= words.length; i++) out.add(words.slice(i, i + n).join(" "));
   return out;
@@ -1281,12 +1286,16 @@ function shingles(text, n = 5) {
 
 function repeatedPhrases(entries, limit = 6) {
   const counts = new Map();
-  entries.forEach((e) => {
+  // Cap the work: on very large corpora an evenly spaced sample gives the
+  // same recurring-template signal without exploding memory.
+  const step = Math.max(1, Math.ceil(entries.length / PHRASE_SAMPLE_CAP));
+  for (let i = 0; i < entries.length; i += step) {
     // Count a phrase once per message, so repetition means "across messages".
-    shingles(textOf(e)).forEach((s) => {
+    shingles(textOf(entries[i])).forEach((s) => {
+      if (!counts.has(s) && counts.size >= PHRASE_MAP_CAP) return;
       counts.set(s, (counts.get(s) || 0) + 1);
     });
-  });
+  }
   return [...counts.entries()]
     .filter(([, c]) => c > 1)
     .sort((a, b) => b[1] - a[1])
@@ -1302,16 +1311,27 @@ export function aggregateCorpus(entries) {
   if (!entries.length) return null;
   const stats = {};
   DIMENSIONS.forEach((d) => {
-    const values = entries.map((e) => e[d.key] || 0);
+    // Built with a loop, not spread: Math.min(...values) blows the call
+    // stack past ~100k messages.
+    const values = new Array(entries.length);
+    let min = Infinity;
+    let max = -Infinity;
+    for (let i = 0; i < entries.length; i++) {
+      const v = entries[i][d.key] || 0;
+      values[i] = v;
+      if (v < min) min = v;
+      if (v > max) max = v;
+    }
     stats[d.key] = {
       label: d.label,
       mean: Math.round(mean(values) * 10) / 10,
       median: Math.round(median(values) * 10) / 10,
-      min: Math.min(...values),
-      max: Math.max(...values),
+      min,
+      max,
       stdev: Math.round(stdev(values) * 10) / 10,
     };
   });
+
 
   const lexiconTally = {};
   entries.forEach((e) => {
