@@ -939,57 +939,110 @@ export function splitBatchText(text) {
     .filter((s) => s.length > 0);
 }
 
-function parseCsv(content) {
-  const rows = [];
+/* ---- Streaming CSV ----------------------------------------------------
+   A resumable, chunk-safe CSV parser. Feed it arbitrary slices of a file
+   (quoted fields may span chunk boundaries) and it emits complete rows. */
+function createCsvParser() {
   let field = "";
   let row = [];
   let inQuotes = false;
-  for (let i = 0; i < content.length; i++) {
-    const ch = content[i];
-    if (inQuotes) {
-      if (ch === '"' && content[i + 1] === '"') {
-        field += '"';
-        i++;
-      } else if (ch === '"') inQuotes = false;
-      else field += ch;
-    } else if (ch === '"') inQuotes = true;
-    else if (ch === ",") {
-      row.push(field);
-      field = "";
-    } else if (ch === "\n") {
-      row.push(field);
-      rows.push(row);
-      row = [];
-      field = "";
-    } else if (ch !== "\r") field += ch;
+  let pendingQuote = false; // saw a '"' inside quotes at the very end of a chunk
+
+  function pushRows(chunk, out) {
+    for (let i = 0; i < chunk.length; i++) {
+      const ch = chunk[i];
+      if (pendingQuote) {
+        pendingQuote = false;
+        if (ch === '"') {
+          field += '"';
+          continue;
+        }
+        inQuotes = false;
+        // fall through and process ch as an unquoted character
+      }
+      if (inQuotes) {
+        if (ch === '"') {
+          if (i === chunk.length - 1) {
+            pendingQuote = true;
+          } else if (chunk[i + 1] === '"') {
+            field += '"';
+            i++;
+          } else {
+            inQuotes = false;
+          }
+        } else field += ch;
+      } else if (ch === '"') inQuotes = true;
+      else if (ch === ",") {
+        row.push(field);
+        field = "";
+      } else if (ch === "\n") {
+        row.push(field);
+        if (row.some((c) => c.trim().length)) out.push(row);
+        row = [];
+        field = "";
+      } else if (ch !== "\r") field += ch;
+    }
   }
-  if (field.length || row.length) {
-    row.push(field);
-    rows.push(row);
+
+  return {
+    push(chunk) {
+      const out = [];
+      pushRows(chunk, out);
+      return out;
+    },
+    flush() {
+      const out = [];
+      if (pendingQuote) {
+        pendingQuote = false;
+        inQuotes = false;
+      }
+      if (field.length || row.length) {
+        row.push(field);
+        if (row.some((c) => c.trim().length)) out.push(row);
+        row = [];
+        field = "";
+      }
+      return out;
+    },
+  };
+}
+
+function parseCsv(content) {
+  const p = createCsvParser();
+  return [...p.push(content), ...p.flush()];
+}
+
+function csvHeaderMap(headerRow) {
+  const header = headerRow.map((h) => h.trim().toLowerCase());
+  return {
+    textIdx: header.findIndex((h) => ["text", "body", "message", "content"].includes(h)),
+    channelIdx: header.indexOf("channel"),
+    outcomeIdx: header.indexOf("outcome"),
+    labelIdx: header.findIndex((h) => ["label", "id", "subject", "name"].includes(h)),
+  };
+}
+
+function csvRowToMessage(row, map) {
+  if (map.textIdx === -1) {
+    const text = row.join(" ").trim();
+    return text ? { text } : null;
   }
-  return rows.filter((r) => r.some((c) => c.trim().length));
+  const text = (row[map.textIdx] || "").trim();
+  if (!text) return null;
+  return {
+    text,
+    channel: map.channelIdx > -1 ? (row[map.channelIdx] || "").trim() : undefined,
+    outcome: map.outcomeIdx > -1 ? (row[map.outcomeIdx] || "").trim() : undefined,
+    label: map.labelIdx > -1 ? (row[map.labelIdx] || "").trim() : undefined,
+  };
 }
 
 function messagesFromCsv(content) {
   const rows = parseCsv(content);
   if (!rows.length) return [];
-  const header = rows[0].map((h) => h.trim().toLowerCase());
-  const textIdx = header.findIndex((h) => ["text", "body", "message", "content"].includes(h));
-  if (textIdx === -1) {
-    return rows.map((r) => ({ text: r.join(" ").trim() })).filter((m) => m.text);
-  }
-  const channelIdx = header.indexOf("channel");
-  const outcomeIdx = header.indexOf("outcome");
-  const labelIdx = header.findIndex((h) => ["label", "id", "subject", "name"].includes(h));
-  return rows
-    .slice(1)
-    .map((r) => ({
-      text: (r[textIdx] || "").trim(),
-      channel: channelIdx > -1 ? (r[channelIdx] || "").trim() : undefined,
-      outcome: outcomeIdx > -1 ? (r[outcomeIdx] || "").trim() : undefined,
-      label: labelIdx > -1 ? (r[labelIdx] || "").trim() : undefined,
-    }))
-    .filter((m) => m.text);
+  const map = csvHeaderMap(rows[0]);
+  const body = map.textIdx === -1 ? rows : rows.slice(1);
+  return body.map((r) => csvRowToMessage(r, map)).filter(Boolean);
 }
 
 function messagesFromJson(content) {
@@ -1021,21 +1074,103 @@ function messagesFromJson(content) {
   return single.text ? [single] : [];
 }
 
-/* Reads dropped files into normalized { text, channel, outcome, label } messages. */
+const yieldToUi = () => new Promise((r) => setTimeout(r, 0));
+
+/* Streams a file and calls onMessage for every parsed message, never
+   holding more than one chunk of raw text at a time. */
+async function streamFileMessages(file, onMessage, { signal } = {}) {
+  const name = file.name.toLowerCase();
+  const isCsv = name.endsWith(".csv");
+  const isJson = name.endsWith(".json");
+  let count = 0;
+
+  // JSON must be parsed whole; small files are cheaper read whole too.
+  if (isJson || (!isCsv && file.size < 4 * 1024 * 1024) || !file.stream) {
+    const content = await file.text();
+    const parsed = isJson
+      ? messagesFromJson(content)
+      : isCsv
+        ? messagesFromCsv(content)
+        : splitBatchText(content).map((t) => ({ text: t }));
+    for (const m of parsed) {
+      onMessage({ label: file.name, ...m });
+      count++;
+    }
+    return count;
+  }
+
+  const reader = file.stream().getReader();
+  const decoder = new TextDecoder("utf-8");
+  const csv = isCsv ? createCsvParser() : null;
+  let headerMap = null;
+  let textTail = "";
+  let sinceYield = 0;
+
+  const handleRows = (rows) => {
+    for (const row of rows) {
+      if (!headerMap) {
+        headerMap = csvHeaderMap(row);
+        if (headerMap.textIdx !== -1) continue; // header row consumed
+      }
+      const m = csvRowToMessage(row, headerMap);
+      if (m) {
+        onMessage({ label: file.name, ...m });
+        count++;
+      }
+    }
+  };
+
+  for (;;) {
+    if (signal?.aborted) break;
+    const { done, value } = await reader.read();
+    if (done) break;
+    const chunk = decoder.decode(value, { stream: true });
+    if (csv) handleRows(csv.push(chunk));
+    else {
+      textTail += chunk;
+      const parts = textTail.split(/^\s*---+\s*$/m);
+      textTail = parts.pop() ?? "";
+      for (const part of parts) {
+        const t = part.trim();
+        if (t) {
+          onMessage({ label: file.name, text: t });
+          count++;
+        }
+      }
+    }
+    sinceYield += chunk.length;
+    if (sinceYield > 1_000_000) {
+      sinceYield = 0;
+      await yieldToUi();
+    }
+  }
+
+  if (csv) handleRows(csv.flush());
+  else {
+    const t = textTail.trim();
+    if (t) {
+      onMessage({ label: file.name, text: t });
+      count++;
+    }
+  }
+  return count;
+}
+
+/* Reads dropped files into normalized { text, channel, outcome, label }
+   messages. Kept for small/simple use; large ingests should use
+   ingestFiles, which scores as it streams. */
 export async function messagesFromFiles(fileList) {
   const files = Array.from(fileList);
   const messages = [];
   const failed = [];
   for (const file of files) {
     try {
-      const content = await file.text();
-      const name = file.name.toLowerCase();
-      let parsed = [];
-      if (name.endsWith(".json")) parsed = messagesFromJson(content);
-      else if (name.endsWith(".csv")) parsed = messagesFromCsv(content);
-      else parsed = splitBatchText(content).map((t) => ({ text: t, label: file.name }));
-      if (!parsed.length) failed.push(file.name);
-      messages.push(...parsed.map((m) => ({ label: file.name, ...m })));
+      let got = 0;
+      await streamFileMessages(file, (m) => {
+        messages.push(m);
+        got++;
+      });
+      if (!got) failed.push(file.name);
     } catch {
       failed.push(file.name);
     }
@@ -1043,20 +1178,85 @@ export async function messagesFromFiles(fileList) {
   return { messages, failed };
 }
 
-export function analyzeCorpus(messages) {
-  return messages
-    .filter((m) => m.text && m.text.trim().length)
-    .map((m, i) =>
-      toEntry(
-        analyzeText(m.text, {
-          label: m.label || `msg-${i + 1}`,
-          channel: CHANNELS.includes(m.channel) ? m.channel : m.channel ? "Other" : "Email",
-          outcome: OUTCOMES.includes(m.outcome) ? m.outcome : "Unknown",
-        }),
-        i,
-      ),
-    );
+function scoreMessage(m, i) {
+  return toEntry(
+    analyzeText(m.text, {
+      label: m.label || `msg-${i + 1}`,
+      channel: CHANNELS.includes(m.channel) ? m.channel : m.channel ? "Other" : "Email",
+      outcome: OUTCOMES.includes(m.outcome) ? m.outcome : "Unknown",
+    }),
+    i,
+  );
 }
+
+/* Synchronous scoring — fine for a handful of messages. */
+export function analyzeCorpus(messages) {
+  return messages.filter((m) => m.text && m.text.trim().length).map(scoreMessage);
+}
+
+/* Batched scoring that yields to the browser between batches so the UI
+   keeps painting. There is no cap on message count. */
+export async function analyzeCorpusAsync(messages, { onProgress, signal, batchSize = 200 } = {}) {
+  const usable = messages.filter((m) => m.text && m.text.trim().length);
+  const entries = [];
+  for (let i = 0; i < usable.length; i++) {
+    if (signal?.aborted) break;
+    entries.push(scoreMessage(usable[i], i));
+    if ((i + 1) % batchSize === 0) {
+      onProgress?.({ done: i + 1, total: usable.length });
+      await yieldToUi();
+    }
+  }
+  onProgress?.({ done: entries.length, total: usable.length });
+  return entries;
+}
+
+/* Streams files straight into scored entries: raw text is discarded as
+   soon as a message is scored, so a 500 MB CSV never lands in memory. */
+export async function ingestFiles(fileList, { onProgress, signal } = {}) {
+  const files = Array.from(fileList);
+  const entries = [];
+  const failed = [];
+  let index = 0;
+  let pending = [];
+
+  const flush = async () => {
+    for (const m of pending) {
+      entries.push(scoreMessage(m, index++));
+    }
+    pending = [];
+    onProgress?.({ done: entries.length, total: null });
+    await yieldToUi();
+  };
+
+  for (const file of files) {
+    if (signal?.aborted) break;
+    try {
+      let got = 0;
+      await streamFileMessages(
+        file,
+        (m) => {
+          got++;
+          pending.push(m);
+        },
+        { signal },
+      );
+      if (!got) failed.push(file.name);
+      // Score whatever this file produced, in batches.
+      while (pending.length && !signal?.aborted) {
+        const batch = pending.splice(0, 200);
+        for (const m of batch) entries.push(scoreMessage(m, index++));
+        onProgress?.({ done: entries.length, total: null });
+        await yieldToUi();
+      }
+    } catch {
+      failed.push(file.name);
+    }
+  }
+  if (pending.length) await flush();
+  return { entries, failed };
+}
+
 
 /* ------------------------------------------------------------
    CORPUS AGGREGATION
