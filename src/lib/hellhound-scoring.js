@@ -1093,7 +1093,7 @@ async function streamFileMessages(file, onMessage, { signal } = {}) {
         ? messagesFromCsv(content)
         : splitBatchText(content).map((t) => ({ text: t }));
     for (const m of parsed) {
-      onMessage({ label: file.name, ...m });
+      await onMessage({ label: file.name, ...m });
       count++;
     }
     return count;
@@ -1106,7 +1106,7 @@ async function streamFileMessages(file, onMessage, { signal } = {}) {
   let textTail = "";
   let sinceYield = 0;
 
-  const handleRows = (rows) => {
+  const handleRows = async (rows) => {
     for (const row of rows) {
       if (!headerMap) {
         headerMap = csvHeaderMap(row);
@@ -1114,7 +1114,7 @@ async function streamFileMessages(file, onMessage, { signal } = {}) {
       }
       const m = csvRowToMessage(row, headerMap);
       if (m) {
-        onMessage({ label: file.name, ...m });
+        await onMessage({ label: file.name, ...m });
         count++;
       }
     }
@@ -1125,7 +1125,7 @@ async function streamFileMessages(file, onMessage, { signal } = {}) {
     const { done, value } = await reader.read();
     if (done) break;
     const chunk = decoder.decode(value, { stream: true });
-    if (csv) handleRows(csv.push(chunk));
+    if (csv) await handleRows(csv.push(chunk));
     else {
       textTail += chunk;
       const parts = textTail.split(/^\s*---+\s*$/m);
@@ -1133,7 +1133,7 @@ async function streamFileMessages(file, onMessage, { signal } = {}) {
       for (const part of parts) {
         const t = part.trim();
         if (t) {
-          onMessage({ label: file.name, text: t });
+          await onMessage({ label: file.name, text: t });
           count++;
         }
       }
@@ -1145,16 +1145,17 @@ async function streamFileMessages(file, onMessage, { signal } = {}) {
     }
   }
 
-  if (csv) handleRows(csv.flush());
+  if (csv) await handleRows(csv.flush());
   else {
     const t = textTail.trim();
     if (t) {
-      onMessage({ label: file.name, text: t });
+      await onMessage({ label: file.name, text: t });
       count++;
     }
   }
   return count;
 }
+
 
 /* Reads dropped files into normalized { text, channel, outcome, label }
    messages. Kept for small/simple use; large ingests should use
