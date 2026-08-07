@@ -1264,9 +1264,10 @@ export default function HellhoundTerminal() {
               <div className="mt-3">
                 <BatchDropzone
                   onFiles={handleCorpusFiles}
-                  hint="Drop .txt / .csv / .json message files (CSV columns: text, channel, outcome, label)"
+                  hint="Drop .txt / .csv / .json / .eml files — large CSVs are streamed, no size cap (CSV columns: text, channel, outcome, label)"
                 />
               </div>
+              {corpusBusy && <ProgressBar label={corpusBusy} onCancel={cancelCorpus} />}
               {corpusError && (
                 <div className="border border-red-500/20 bg-red-500/5 rounded-2xl p-3 mt-3 flex items-start gap-2">
                   <AlertTriangle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
@@ -1279,7 +1280,8 @@ export default function HellhoundTerminal() {
                 </span>
                 <button
                   onClick={handleCorpusPaste}
-                  className="px-6 py-2.5 bg-gradient-to-r from-rose-600 to-rose-500 hover:from-rose-500 hover:to-rose-400 text-white font-semibold text-xs rounded-xl transition-all shadow-lg shadow-rose-950/40"
+                  disabled={!!corpusBusy}
+                  className="px-6 py-2.5 bg-gradient-to-r from-rose-600 to-rose-500 hover:from-rose-500 hover:to-rose-400 disabled:opacity-40 text-white font-semibold text-xs rounded-xl transition-all shadow-lg shadow-rose-950/40"
                 >
                   Score corpus
                 </button>
@@ -1297,18 +1299,13 @@ export default function HellhoundTerminal() {
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <button
-                      onClick={() => handleSendCorpusTo("A")}
+                      onClick={handleSendCorpusTo}
                       className="text-xs text-zinc-400 hover:text-rose-300 transition-colors"
                     >
-                      Send to campaign A
-                    </button>
-                    <button
-                      onClick={() => handleSendCorpusTo("B")}
-                      className="text-xs text-zinc-400 hover:text-rose-300 transition-colors"
-                    >
-                      Send to campaign B
+                      Send to a campaign slot
                     </button>
                   </div>
+
                   <div className="flex items-center gap-3">
                     <button
                       onClick={handleDownloadCorpus}
