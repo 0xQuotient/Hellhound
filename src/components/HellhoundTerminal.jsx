@@ -1504,68 +1504,67 @@ export default function HellhoundTerminal() {
           </div>
         )}
 
-        {/* ============ CAMPAIGN A/B ============ */}
+        {/* ============ CAMPAIGN COMPARISON ============ */}
         {mode === "compare" && (
           <div className="space-y-4">
             <Card>
-              <SectionLabel sub="Load two whole campaigns — any mix of channels and volumes — and compare their construction against each other.">
+              <SectionLabel sub="Load as many campaigns as you like — any mix of channels and volumes — and cross-analyse their construction against each other.">
                 Campaign comparison
               </SectionLabel>
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                <CampaignPanel
-                  slot="A"
-                  accent="bg-sky-400"
-                  campaign={campaignA}
-                  draft={draftA}
-                  onDraftChange={setDraftA}
-                  onFiles={(f) => loadCampaignFiles("A", f)}
-                  onAnalyze={() => scoreCampaign("A")}
-                  onClear={() => setCampaignA(null)}
-                  onDownload={() => downloadCampaign("A")}
-                  error={errorA}
-                />
-                <CampaignPanel
-                  slot="B"
-                  accent="bg-rose-400"
-                  campaign={campaignB}
-                  draft={draftB}
-                  onDraftChange={setDraftB}
-                  onFiles={(f) => loadCampaignFiles("B", f)}
-                  onAnalyze={() => scoreCampaign("B")}
-                  onClear={() => setCampaignB(null)}
-                  onDownload={() => downloadCampaign("B")}
-                  error={errorB}
-                />
+                {slots.map((s, i) => (
+                  <CampaignPanel
+                    key={s.id}
+                    index={i}
+                    color={CAMPAIGN_COLORS[i % CAMPAIGN_COLORS.length]}
+                    campaign={s.campaign}
+                    draft={s.draft}
+                    error={s.error}
+                    busy={s.busy}
+                    canRemove={slots.length > 1}
+                    onDraftChange={(draft) => patchSlot(s.id, { draft })}
+                    onFiles={(f) => loadCampaignFiles(s.id, f)}
+                    onAnalyze={() => scoreCampaign(s.id)}
+                    onClear={() => patchSlot(s.id, { campaign: null })}
+                    onRemove={() => removeSlot(s.id)}
+                    onDownload={() => downloadCampaign(s.id)}
+                  />
+                ))}
               </div>
+              <button
+                onClick={addSlot}
+                className="mt-4 flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold bg-white/5 hover:bg-white/10 text-zinc-200 transition-colors"
+              >
+                <Plus className="w-3.5 h-3.5" /> Add campaign
+              </button>
             </Card>
 
             {!comparison ? (
               <div className="border border-dashed border-white/10 rounded-3xl p-8 text-center">
                 <p className="text-xs text-zinc-500">
-                  Load and score both campaigns to see the comparison.
+                  Score at least two campaigns to see the cross-analysis.
                 </p>
               </div>
             ) : (
               <>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                  <StatChip label={`${campaignA.name} messages`} value={campaignA.entries.length} />
-                  <StatChip
-                    label={`${campaignA.name} mean index`}
-                    value={campaignA.summary.stats.compositeIndex.mean}
-                  />
-                  <StatChip label={`${campaignB.name} messages`} value={campaignB.entries.length} />
-                  <StatChip
-                    label={`${campaignB.name} mean index`}
-                    value={campaignB.summary.stats.compositeIndex.mean}
-                  />
+                  {comparison.campaigns.map((c, i) => (
+                    <StatChip
+                      key={i}
+                      label={`${c.name} · ${c.entries.length.toLocaleString()} msgs`}
+                      value={c.summary.stats.compositeIndex.mean}
+                    />
+                  ))}
                 </div>
 
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                   <Card watermark>
-                    <SectionLabel sub={`${campaignA.name} in blue · ${campaignB.name} in crimson`}>
-                      Paired profile
+                    <SectionLabel
+                      sub={comparison.series.map((s) => s.name).join(" · ")}
+                    >
+                      Overlaid profiles
                     </SectionLabel>
-                    <div className="h-64">
+                    <div className="h-72">
                       <ResponsiveContainer width="100%" height="100%">
                         <RadarChart data={comparison.radar} outerRadius="70%">
                           <PolarGrid stroke="rgba(255,255,255,0.08)" />
@@ -1574,35 +1573,26 @@ export default function HellhoundTerminal() {
                             tick={{ fill: "#a1a1aa", fontSize: 9 }}
                           />
                           <PolarRadiusAxis domain={[0, 100]} tick={false} axisLine={false} />
-                          <Radar
-                            name={campaignA.name}
-                            dataKey="A"
-                            stroke="#38bdf8"
-                            fill="#38bdf8"
-                            fillOpacity={0.16}
-                            strokeWidth={2}
-                          />
-                          <Radar
-                            name={campaignB.name}
-                            dataKey="B"
-                            stroke="#fb7185"
-                            fill="#fb7185"
-                            fillOpacity={0.16}
-                            strokeWidth={2}
-                          />
+                          {comparison.series.map((s) => (
+                            <Radar
+                              key={s.key}
+                              name={s.name}
+                              dataKey={s.key}
+                              stroke={s.color}
+                              fill={s.color}
+                              fillOpacity={0.12}
+                              strokeWidth={2}
+                            />
+                          ))}
                         </RadarChart>
                       </ResponsiveContainer>
                     </div>
                   </Card>
                   <Card>
-                    <SectionLabel
-                      sub={`Left bar favours ${campaignA.name}, right bar favours ${campaignB.name}`}
-                    >
-                      Per-dimension delta
+                    <SectionLabel sub="Mean score per campaign on each rubric dimension">
+                      Cross-campaign matrix
                     </SectionLabel>
-                    {comparison.deltas.map((d) => (
-                      <DeltaRow key={d.key} row={d} nameA={campaignA.name} nameB={campaignB.name} />
-                    ))}
+                    <ComparisonMatrix rows={comparison.rows} series={comparison.series} />
                   </Card>
                 </div>
 
@@ -1619,9 +1609,11 @@ export default function HellhoundTerminal() {
                 </Card>
 
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                  {[campaignA, campaignB].map((c, i) => (
+                  {comparison.campaigns.map((c, i) => (
                     <Card key={i}>
-                      <SectionLabel sub={`${c.entries.length} messages`}>{c.name}</SectionLabel>
+                      <SectionLabel sub={`${c.entries.length.toLocaleString()} messages`}>
+                        {c.name}
+                      </SectionLabel>
                       <p className="text-xs text-zinc-500 mb-2">Channel mix</p>
                       <MixBars items={c.summary.channelMix} total={c.entries.length} />
                       <p className="text-xs text-zinc-500 mt-4 mb-2">Pretext mix</p>
@@ -1633,6 +1625,7 @@ export default function HellhoundTerminal() {
             )}
           </div>
         )}
+
 
         <p className="text-xs text-zinc-600 mt-6 text-center">
           Nothing is stored. No accounts, no database, no localStorage, no network calls —
