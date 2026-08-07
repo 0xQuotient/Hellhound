@@ -1213,22 +1213,14 @@ export async function analyzeCorpusAsync(messages, { onProgress, signal, batchSi
 }
 
 /* Streams files straight into scored entries: raw text is discarded as
-   soon as a message is scored, so a 500 MB CSV never lands in memory. */
+   soon as a message is scored, so a very large CSV never lands in memory
+   as one string. There is no cap on message count. */
 export async function ingestFiles(fileList, { onProgress, signal } = {}) {
   const files = Array.from(fileList);
   const entries = [];
   const failed = [];
   let index = 0;
-  let pending = [];
-
-  const flush = async () => {
-    for (const m of pending) {
-      entries.push(scoreMessage(m, index++));
-    }
-    pending = [];
-    onProgress?.({ done: entries.length, total: null });
-    await yieldToUi();
-  };
+  let sinceYield = 0;
 
   for (const file of files) {
     if (signal?.aborted) break;
@@ -1236,27 +1228,29 @@ export async function ingestFiles(fileList, { onProgress, signal } = {}) {
       let got = 0;
       await streamFileMessages(
         file,
-        (m) => {
+        async (m) => {
+          if (signal?.aborted) return;
           got++;
-          pending.push(m);
+          if (!m.text || !m.text.trim()) return;
+          entries.push(scoreMessage(m, index++));
+          if (++sinceYield >= 200) {
+            sinceYield = 0;
+            onProgress?.({ done: entries.length, file: file.name });
+            await yieldToUi();
+          }
         },
         { signal },
       );
       if (!got) failed.push(file.name);
-      // Score whatever this file produced, in batches.
-      while (pending.length && !signal?.aborted) {
-        const batch = pending.splice(0, 200);
-        for (const m of batch) entries.push(scoreMessage(m, index++));
-        onProgress?.({ done: entries.length, total: null });
-        await yieldToUi();
-      }
+      onProgress?.({ done: entries.length, file: file.name });
+      await yieldToUi();
     } catch {
       failed.push(file.name);
     }
   }
-  if (pending.length) await flush();
   return { entries, failed };
 }
+
 
 
 /* ------------------------------------------------------------
