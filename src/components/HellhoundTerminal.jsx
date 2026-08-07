@@ -589,75 +589,87 @@ function ProgressBar({ label, onCancel }) {
 
 
 function CampaignPanel({
-  slot,
+  index,
   campaign,
   draft,
   onDraftChange,
   onFiles,
   onAnalyze,
+  onRemove,
   onClear,
   onDownload,
   error,
-  accent,
+  busy,
+  color,
+  canRemove,
 }) {
   const count = campaign?.entries.length ?? 0;
   return (
     <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-4">
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
-          <span className={`w-2 h-2 rounded-full ${accent}`} />
+          <span className="w-2 h-2 rounded-full" style={{ background: color }} />
           <input
             type="text"
             value={draft.name}
             onChange={(e) => onDraftChange({ ...draft, name: e.target.value })}
-            placeholder={`Campaign ${slot} name`}
+            placeholder={`Campaign ${index + 1} name`}
             className="bg-transparent text-xs font-semibold text-zinc-200 focus:outline-none w-40"
           />
         </div>
-        {count > 0 && (
-          <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3">
+          {count > 0 && (
+            <>
+              <button
+                onClick={onDownload}
+                className="flex items-center gap-1 text-xs text-zinc-400 hover:text-rose-300 transition-colors"
+              >
+                <Download className="w-3.5 h-3.5" /> Save
+              </button>
+              <button
+                onClick={onClear}
+                className="flex items-center gap-1 text-xs text-zinc-500 hover:text-red-400 transition-colors"
+              >
+                <X className="w-3.5 h-3.5" /> Clear
+              </button>
+            </>
+          )}
+          {canRemove && (
             <button
-              onClick={onDownload}
-              className="flex items-center gap-1 text-xs text-zinc-400 hover:text-rose-300 transition-colors"
+              onClick={onRemove}
+              title="Remove campaign slot"
+              className="text-zinc-600 hover:text-red-400 transition-colors"
             >
-              <Download className="w-3.5 h-3.5" /> Save
+              <Trash2 className="w-3.5 h-3.5" />
             </button>
-            <button
-              onClick={onClear}
-              className="flex items-center gap-1 text-xs text-zinc-500 hover:text-red-400 transition-colors"
-            >
-              <X className="w-3.5 h-3.5" /> Clear
-            </button>
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
       <textarea
         value={draft.text}
         onChange={(e) => onDraftChange({ ...draft, text: e.target.value })}
         rows={5}
-        placeholder={`Paste campaign ${slot} messages, separated by a line containing only ---`}
+        placeholder={`Paste ${draft.name || `campaign ${index + 1}`} messages, separated by a line containing only ---`}
         className="w-full bg-black/30 border border-white/10 focus:border-rose-500/50 focus:outline-none rounded-xl p-3 text-xs leading-relaxed text-zinc-200 placeholder-zinc-600 resize-y font-mono transition-colors"
       />
       <div className="mt-2">
-        <BatchDropzone
-          onFiles={onFiles}
-          hint={`Drop campaign ${slot} files (.txt / .csv / .json)`}
-        />
+        <BatchDropzone onFiles={onFiles} hint="Drop campaign files (.txt / .csv / .json / .eml)" />
       </div>
       {error && <p className="text-xs text-red-400 mt-2">{error}</p>}
+      {busy && <ProgressBar label={busy} />}
 
       <div className="flex items-center justify-between mt-3">
         <span className="text-xs text-zinc-600">
           {count > 0
-            ? `${count} messages · ${campaign.summary.channelMix.map((m) => `${m.count} ${m.key.toLowerCase()}`).join(" + ")}`
+            ? `${count.toLocaleString()} messages · ${campaign.summary.channelMix.map((m) => `${m.count} ${m.key.toLowerCase()}`).join(" + ")}`
             : "No messages loaded"}
         </span>
         <button
           onClick={onAnalyze}
           className="px-4 py-1.5 rounded-xl text-xs font-semibold bg-white/5 hover:bg-white/10 text-zinc-200 transition-colors"
         >
-          Score campaign {slot}
+          Score campaign
         </button>
       </div>
     </div>
@@ -668,8 +680,17 @@ function CampaignPanel({
    MAIN COMPONENT
    ============================================================ */
 
+let slotSeq = 0;
+const newSlot = (name) => ({
+  id: `slot-${++slotSeq}`,
+  draft: { name: name || `Campaign ${slotSeq}`, text: "" },
+  campaign: null,
+  error: null,
+  busy: null,
+});
+
 export default function HellhoundTerminal() {
-  const [mode, setMode] = useState("single");
+  const [mode, setMode] = useState("corpus");
   const [now, setNow] = useState(null);
 
   // Single sample
@@ -683,14 +704,11 @@ export default function HellhoundTerminal() {
   const [corpusText, setCorpusText] = useState("");
   const [corpusEntries, setCorpusEntries] = useState([]);
   const [corpusError, setCorpusError] = useState(null);
+  const [corpusBusy, setCorpusBusy] = useState(null);
+  const corpusAbort = useRef(null);
 
-  // Campaign A/B
-  const [draftA, setDraftA] = useState({ name: "Campaign A", text: "" });
-  const [draftB, setDraftB] = useState({ name: "Campaign B", text: "" });
-  const [campaignA, setCampaignA] = useState(null);
-  const [campaignB, setCampaignB] = useState(null);
-  const [errorA, setErrorA] = useState(null);
-  const [errorB, setErrorB] = useState(null);
+  // Campaigns — an unbounded list of slots, compared all at once.
+  const [slots, setSlots] = useState(() => [newSlot("Campaign 1"), newSlot("Campaign 2")]);
 
   /* Everything above lives in React memory only. No localStorage, no
      sessionStorage, no cookies, no server, no database. Reloading the tab
@@ -738,34 +756,46 @@ export default function HellhoundTerminal() {
 
   /* ---------- corpus ---------- */
 
-  const runCorpus = useCallback((messages) => {
-    const scored = analyzeCorpus(messages);
-    if (!scored.length) {
-      setCorpusError("No readable messages found.");
-      return;
-    }
-    setCorpusError(null);
-    setCorpusEntries(scored);
-  }, []);
-
-  const handleCorpusPaste = useCallback(() => {
+  const handleCorpusPaste = useCallback(async () => {
     const chunks = splitBatchText(corpusText);
     if (!chunks.length) {
       setCorpusError("Paste at least one message.");
       return;
     }
-    runCorpus(chunks.map((t, i) => ({ text: t, label: `pasted-${i + 1}` })));
-  }, [corpusText, runCorpus]);
+    setCorpusError(null);
+    setCorpusBusy("Scoring 0 messages…");
+    const scored = await analyzeCorpusAsync(
+      chunks.map((t, i) => ({ text: t, label: `pasted-${i + 1}` })),
+      { onProgress: ({ done }) => setCorpusBusy(`Scoring ${done.toLocaleString()} messages…`) },
+    );
+    setCorpusBusy(null);
+    if (!scored.length) setCorpusError("No readable messages found.");
+    else setCorpusEntries(scored);
+  }, [corpusText]);
 
-  const handleCorpusFiles = useCallback(
-    async (fileList) => {
-      const { messages, failed } = await messagesFromFiles(fileList);
+  const handleCorpusFiles = useCallback(async (fileList) => {
+    const controller = new AbortController();
+    corpusAbort.current = controller;
+    setCorpusError(null);
+    setCorpusBusy("Reading files…");
+    try {
+      const { entries, failed } = await ingestFiles(fileList, {
+        signal: controller.signal,
+        onProgress: ({ done, file }) =>
+          setCorpusBusy(`Scored ${done.toLocaleString()} messages · ${file}`),
+      });
       if (failed.length) setCorpusError(`Could not read: ${failed.join(", ")}`);
-      if (messages.length) runCorpus(messages);
+      if (entries.length) setCorpusEntries(entries);
       else if (!failed.length) setCorpusError("No readable messages found.");
-    },
-    [runCorpus],
-  );
+    } catch (err) {
+      setCorpusError(`Ingest failed: ${err?.message || "unknown error"}`);
+    } finally {
+      setCorpusBusy(null);
+      corpusAbort.current = null;
+    }
+  }, []);
+
+  const cancelCorpus = useCallback(() => corpusAbort.current?.abort(), []);
 
   const corpusSummary = useMemo(() => aggregateCorpus(corpusEntries), [corpusEntries]);
 
@@ -787,58 +817,66 @@ export default function HellhoundTerminal() {
     );
   }, [corpusEntries, corpusSummary]);
 
-  const handleSendCorpusTo = useCallback(
-    (slot) => {
-      if (!corpusEntries.length) return;
-      const campaign = buildCampaign(slot === "A" ? draftA.name : draftB.name, corpusEntries);
-      if (slot === "A") setCampaignA(campaign);
-      else setCampaignB(campaign);
-      setMode("compare");
-    },
-    [corpusEntries, draftA.name, draftB.name],
-  );
-
   /* ---------- campaigns ---------- */
 
+  const patchSlot = useCallback((id, patch) => {
+    setSlots((prev) => prev.map((s) => (s.id === id ? { ...s, ...patch } : s)));
+  }, []);
+
+  const addSlot = useCallback(() => {
+    setSlots((prev) => [...prev, newSlot(`Campaign ${prev.length + 1}`)]);
+  }, []);
+
+  const removeSlot = useCallback((id) => {
+    setSlots((prev) => (prev.length <= 1 ? prev : prev.filter((s) => s.id !== id)));
+  }, []);
+
   const scoreCampaign = useCallback(
-    (slot) => {
-      const draft = slot === "A" ? draftA : draftB;
-      const setErr = slot === "A" ? setErrorA : setErrorB;
-      const chunks = splitBatchText(draft.text);
+    async (id) => {
+      const slot = slots.find((s) => s.id === id);
+      if (!slot) return;
+      const chunks = splitBatchText(slot.draft.text);
       if (!chunks.length) {
-        setErr("Paste messages or drop files first.");
+        patchSlot(id, { error: "Paste messages or drop files first." });
         return;
       }
-      setErr(null);
-      const entries = analyzeCorpus(
-        chunks.map((t, i) => ({ text: t, label: `${draft.name}-${i + 1}` })),
+      patchSlot(id, { error: null, busy: "Scoring…" });
+      const entries = await analyzeCorpusAsync(
+        chunks.map((t, i) => ({ text: t, label: `${slot.draft.name}-${i + 1}` })),
+        {
+          onProgress: ({ done }) =>
+            patchSlot(id, { busy: `Scored ${done.toLocaleString()} messages…` }),
+        },
       );
-      const campaign = buildCampaign(draft.name, entries);
-      if (slot === "A") setCampaignA(campaign);
-      else setCampaignB(campaign);
+      patchSlot(id, { busy: null, campaign: buildCampaign(slot.draft.name, entries) });
     },
-    [draftA, draftB],
+    [slots, patchSlot],
   );
 
   const loadCampaignFiles = useCallback(
-    async (slot, fileList) => {
-      const setErr = slot === "A" ? setErrorA : setErrorB;
-      const draft = slot === "A" ? draftA : draftB;
-      const { messages, failed } = await messagesFromFiles(fileList);
-      if (failed.length) setErr(`Could not read: ${failed.join(", ")}`);
-      if (!messages.length) return;
-      setErr(null);
-      const entries = analyzeCorpus(messages);
-      const campaign = buildCampaign(draft.name, entries);
-      if (slot === "A") setCampaignA(campaign);
-      else setCampaignB(campaign);
+    async (id, fileList) => {
+      const slot = slots.find((s) => s.id === id);
+      if (!slot) return;
+      patchSlot(id, { error: null, busy: "Reading files…" });
+      try {
+        const { entries, failed } = await ingestFiles(fileList, {
+          onProgress: ({ done, file }) =>
+            patchSlot(id, { busy: `Scored ${done.toLocaleString()} messages · ${file}` }),
+        });
+        if (failed.length) patchSlot(id, { error: `Could not read: ${failed.join(", ")}` });
+        if (entries.length)
+          patchSlot(id, { campaign: buildCampaign(slot.draft.name, entries), busy: null });
+        else patchSlot(id, { busy: null });
+      } catch (err) {
+        patchSlot(id, { busy: null, error: `Ingest failed: ${err?.message || "unknown error"}` });
+      }
     },
-    [draftA, draftB],
+    [slots, patchSlot],
   );
 
   const downloadCampaign = useCallback(
-    (slot) => {
-      const campaign = slot === "A" ? campaignA : campaignB;
+    (id) => {
+      const campaign = slots.find((s) => s.id === id)?.campaign;
       if (!campaign) return;
       downloadJSON(
         {
@@ -856,10 +894,26 @@ export default function HellhoundTerminal() {
         `hellhound-campaign-${campaign.name.replace(/\s+/g, "-").toLowerCase()}.json`,
       );
     },
-    [campaignA, campaignB],
+    [slots],
   );
 
-  const comparison = useMemo(() => compareCampaigns(campaignA, campaignB), [campaignA, campaignB]);
+  const handleSendCorpusTo = useCallback(() => {
+    if (!corpusEntries.length) return;
+    setSlots((prev) => {
+      const target = prev.find((s) => !s.campaign);
+      const name = target?.draft.name || `Campaign ${prev.length + 1}`;
+      const campaign = buildCampaign(name, corpusEntries);
+      if (target) return prev.map((s) => (s.id === target.id ? { ...s, campaign } : s));
+      return [...prev, { ...newSlot(name), campaign }];
+    });
+    setMode("compare");
+  }, [corpusEntries]);
+
+  const comparison = useMemo(
+    () => compareCampaigns(slots.map((s) => s.campaign).filter(Boolean)),
+    [slots],
+  );
+
 
   /* ---------- derived (single) ---------- */
 
