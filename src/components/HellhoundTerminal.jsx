@@ -465,9 +465,12 @@ function ComparisonMatrix({ rows, series }) {
 }
 
 
+const PAGE_SIZE = 100;
+
 function CorpusTable({ entries }) {
   const [sortKey, setSortKey] = useState("compositeIndex");
   const [asc, setAsc] = useState(false);
+  const [page, setPage] = useState(0);
   const cols = [
     { key: "label", label: "Message" },
     { key: "channel", label: "Channel" },
@@ -488,6 +491,10 @@ function CorpusTable({ entries }) {
     return asc ? s : s.reverse();
   }, [entries, sortKey, asc]);
 
+  const pageCount = Math.max(1, Math.ceil(sorted.length / PAGE_SIZE));
+  const current = Math.min(page, pageCount - 1);
+  const rows = sorted.slice(current * PAGE_SIZE, current * PAGE_SIZE + PAGE_SIZE);
+
   return (
     <div className="overflow-x-auto -mx-1 px-1">
       <table className="w-full text-xs">
@@ -502,6 +509,7 @@ function CorpusTable({ entries }) {
                     setSortKey(c.key);
                     setAsc(false);
                   }
+                  setPage(0);
                 }}
                 className={`text-left font-normal py-2 pr-3 cursor-pointer whitespace-nowrap hover:text-zinc-300 ${sortKey === c.key ? "text-rose-300" : ""}`}
               >
@@ -511,7 +519,7 @@ function CorpusTable({ entries }) {
           </tr>
         </thead>
         <tbody className="divide-y divide-white/5">
-          {sorted.slice(0, 200).map((e) => (
+          {rows.map((e) => (
             <tr key={e.id} className="text-zinc-400">
               <td className="py-2 pr-3 max-w-[16rem] truncate text-zinc-300" title={e.excerpt}>
                 {e.label || e.excerpt.slice(0, 40)}
@@ -527,12 +535,58 @@ function CorpusTable({ entries }) {
           ))}
         </tbody>
       </table>
-      {sorted.length > 200 && (
-        <p className="text-xs text-zinc-600 mt-2">Showing first 200 of {sorted.length} rows.</p>
+      {pageCount > 1 && (
+        <div className="flex items-center justify-between mt-3">
+          <span className="text-xs text-zinc-600 font-mono tabular-nums">
+            {current * PAGE_SIZE + 1}–{Math.min(sorted.length, (current + 1) * PAGE_SIZE)} of{" "}
+            {sorted.length.toLocaleString()}
+          </span>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setPage(Math.max(0, current - 1))}
+              disabled={current === 0}
+              className="px-3 py-1 rounded-lg text-xs bg-white/5 text-zinc-300 disabled:opacity-30 hover:bg-white/10 transition-colors"
+            >
+              Prev
+            </button>
+            <span className="text-xs text-zinc-600 font-mono tabular-nums">
+              {current + 1}/{pageCount}
+            </span>
+            <button
+              onClick={() => setPage(Math.min(pageCount - 1, current + 1))}
+              disabled={current >= pageCount - 1}
+              className="px-3 py-1 rounded-lg text-xs bg-white/5 text-zinc-300 disabled:opacity-30 hover:bg-white/10 transition-colors"
+            >
+              Next
+            </button>
+          </div>
+        </div>
       )}
     </div>
   );
 }
+
+function ProgressBar({ label, onCancel }) {
+  return (
+    <div className="mt-3 rounded-2xl border border-white/10 bg-white/[0.02] p-3">
+      <div className="flex items-center justify-between mb-2">
+        <span className="text-xs text-zinc-400 font-mono tabular-nums">{label}</span>
+        {onCancel && (
+          <button
+            onClick={onCancel}
+            className="text-xs text-zinc-500 hover:text-red-400 transition-colors"
+          >
+            Cancel
+          </button>
+        )}
+      </div>
+      <div className="h-1 rounded-full bg-white/5 overflow-hidden">
+        <div className="h-full w-1/3 rounded-full bg-gradient-to-r from-rose-600 to-rose-400 animate-pulse" />
+      </div>
+    </div>
+  );
+}
+
 
 function CampaignPanel({
   slot,
