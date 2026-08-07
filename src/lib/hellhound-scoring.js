@@ -1346,7 +1346,9 @@ export function aggregateCorpus(entries) {
     .sort((a, b) => b.count - a.count)
     .slice(0, 12);
 
-  const sortedByIndex = [...entries].sort((a, b) => b.compositeIndex - a.compositeIndex);
+  const pickBy = (key, dir) =>
+    entries.reduce((best, e) => (dir * (e[key] - best[key]) > 0 ? e : best), entries[0]);
+
   const buckets = [0, 0, 0, 0, 0];
   entries.forEach((e) => {
     buckets[Math.min(4, Math.floor(e.compositeIndex / 20))] += 1;
