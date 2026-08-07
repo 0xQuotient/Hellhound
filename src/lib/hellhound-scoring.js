@@ -910,7 +910,6 @@ export function toEntry(analysis, index = 0) {
   };
 }
 
-
 /* Dimensions used for corpus aggregation and campaign comparison. */
 export const DIMENSIONS = [
   { key: "compositeIndex", label: "Composite index" },
@@ -1156,7 +1155,6 @@ async function streamFileMessages(file, onMessage, { signal } = {}) {
   return count;
 }
 
-
 /* Reads dropped files into normalized { text, channel, outcome, label }
    messages. Kept for small/simple use; large ingests should use
    ingestFiles, which scores as it streams. */
@@ -1251,8 +1249,6 @@ export async function ingestFiles(fileList, { onProgress, signal } = {}) {
   return { entries, failed };
 }
 
-
-
 /* ------------------------------------------------------------
    CORPUS AGGREGATION
    ------------------------------------------------------------ */
@@ -1331,7 +1327,6 @@ export function aggregateCorpus(entries) {
       stdev: Math.round(stdev(values) * 10) / 10,
     };
   });
-
 
   const lexiconTally = {};
   entries.forEach((e) => {
@@ -1432,7 +1427,6 @@ export function aggregateCorpus(entries) {
   };
 }
 
-
 /* ------------------------------------------------------------
    CAMPAIGN COMPARISON
    ------------------------------------------------------------ */
@@ -1528,9 +1522,10 @@ export function compareCampaigns(campaignList) {
 
   const shared = campaigns
     .map((c) => new Set(c.summary.pretextMix.map((p) => p.key)))
-    .reduce((acc, set) => acc.filter((k) => set.has(k)), [
-      ...campaigns[0].summary.pretextMix.map((p) => p.key),
-    ]);
+    .reduce(
+      (acc, set) => acc.filter((k) => set.has(k)),
+      [...campaigns[0].summary.pretextMix.map((p) => p.key)],
+    );
   findings.push(
     shared.length
       ? `Pretext families present in every campaign: ${shared.join(", ")}.`
@@ -1553,4 +1548,3 @@ export function compareCampaigns(campaignList) {
 
   return { campaigns, names, rows, radar, series, findings };
 }
-

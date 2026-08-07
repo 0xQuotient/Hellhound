@@ -31,7 +31,6 @@ import {
   CAMPAIGN_COLORS,
   riskTier,
   analyzeText,
-  analyzeCorpus,
   analyzeCorpusAsync,
   ingestFiles,
   aggregateCorpus,
@@ -39,7 +38,6 @@ import {
   buildCampaign,
   compareCampaigns,
 } from "@/lib/hellhound-scoring";
-
 
 /* ============================================================
    FILE HELPERS (client-side only — nothing here calls a server)
@@ -464,7 +462,6 @@ function ComparisonMatrix({ rows, series }) {
   );
 }
 
-
 const PAGE_SIZE = 100;
 
 function CorpusTable({ entries }) {
@@ -586,7 +583,6 @@ function ProgressBar({ label, onCancel }) {
     </div>
   );
 }
-
 
 function CampaignPanel({
   index,
@@ -914,7 +910,6 @@ export default function HellhoundTerminal() {
     [slots],
   );
 
-
   /* ---------- derived (single) ---------- */
 
   const tier = result ? riskTier(result.semantic.composite_index) : null;
@@ -996,7 +991,6 @@ export default function HellhoundTerminal() {
           <ModeTab active={mode === "single"} onClick={() => setMode("single")} icon={FileText}>
             Single sample
           </ModeTab>
-
         </div>
 
         {/* ============ SINGLE SAMPLE ============ */}
@@ -1557,9 +1551,7 @@ export default function HellhoundTerminal() {
 
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                   <Card watermark>
-                    <SectionLabel
-                      sub={comparison.series.map((s) => s.name).join(" · ")}
-                    >
+                    <SectionLabel sub={comparison.series.map((s) => s.name).join(" · ")}>
                       Overlaid profiles
                     </SectionLabel>
                     <div className="h-72">
@@ -1623,7 +1615,6 @@ export default function HellhoundTerminal() {
             )}
           </div>
         )}
-
 
         <p className="text-xs text-zinc-600 mt-6 text-center">
           Nothing is stored. No accounts, no database, no localStorage, no network calls —
