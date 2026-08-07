@@ -413,36 +413,57 @@ function DistributionHistogram({ buckets }) {
   );
 }
 
-function DeltaRow({ row, nameA, nameB }) {
-  const positive = row.delta > 0;
-  const magnitude = Math.min(100, Math.abs(row.delta) * 2);
+function ComparisonMatrix({ rows, series }) {
   return (
-    <div className="grid grid-cols-[9rem_1fr_4.5rem] items-center gap-3 text-xs py-1.5">
-      <span className="truncate text-zinc-300">{row.label}</span>
-      <div className="flex items-center">
-        <div className="flex-1 flex justify-end">
-          <div
-            className="h-1.5 rounded-l-full bg-gradient-to-l from-sky-400 to-sky-600"
-            style={{ width: positive ? 0 : `${magnitude}%` }}
-          />
-        </div>
-        <div className="w-px h-3 bg-white/15" />
-        <div className="flex-1">
-          <div
-            className="h-1.5 rounded-r-full bg-gradient-to-r from-rose-600 to-rose-400"
-            style={{ width: positive ? `${magnitude}%` : 0 }}
-          />
-        </div>
-      </div>
-      <span
-        className="text-right font-mono tabular-nums text-zinc-400"
-        title={`${nameA}: ${row.a} · ${nameB}: ${row.b}`}
-      >
-        {row.a} / {row.b}
-      </span>
+    <div className="overflow-x-auto -mx-1 px-1">
+      <table className="w-full text-xs">
+        <thead>
+          <tr className="text-zinc-500">
+            <th className="text-left font-normal py-2 pr-3">Dimension</th>
+            {series.map((s) => (
+              <th key={s.key} className="text-right font-normal py-2 pr-3 whitespace-nowrap">
+                <span className="inline-flex items-center gap-1.5">
+                  <span
+                    className="w-2 h-2 rounded-full inline-block"
+                    style={{ background: s.color }}
+                  />
+                  {s.name}
+                </span>
+              </th>
+            ))}
+            <th className="text-right font-normal py-2">Spread</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-white/5">
+          {rows.map((r) => (
+            <tr key={r.key}>
+              <td className="py-1.5 pr-3 text-zinc-400 whitespace-nowrap">{r.label}</td>
+              {r.values.map((v, i) => (
+                <td
+                  key={i}
+                  className={`py-1.5 pr-3 text-right font-mono tabular-nums ${
+                    i === r.maxIndex
+                      ? "text-rose-300"
+                      : i === r.minIndex
+                        ? "text-sky-300"
+                        : "text-zinc-300"
+                  }`}
+                >
+                  {v}
+                </td>
+              ))}
+              <td className="py-1.5 text-right font-mono tabular-nums text-zinc-600">{r.spread}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <p className="text-xs text-zinc-600 mt-2">
+        Crimson marks the highest campaign on a dimension, blue the lowest.
+      </p>
     </div>
   );
 }
+
 
 function CorpusTable({ entries }) {
   const [sortKey, setSortKey] = useState("compositeIndex");
