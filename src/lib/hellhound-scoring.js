@@ -1392,12 +1392,11 @@ export function aggregateCorpus(entries) {
 
   // Outcome correlation, only when outcomes were supplied.
   const withOutcome = entries.filter((e) => e.outcome && e.outcome !== "Unknown");
-  const succeeded = withOutcome.filter(
-    (e) => e.outcome === "Clicked" || e.outcome === "Credentials Entered",
-  );
+  const isSuccess = (e) => e.outcome === "Clicked" || e.outcome === "Credentials Entered";
+  const succeeded = withOutcome.filter(isSuccess);
   let outcomeSignal = null;
   if (succeeded.length >= 2 && withOutcome.length - succeeded.length >= 2) {
-    const others = withOutcome.filter((e) => !succeeded.includes(e));
+    const others = withOutcome.filter((e) => !isSuccess(e));
     outcomeSignal = DIMENSIONS.map((d) => ({
       label: d.label,
       delta:
@@ -1425,13 +1424,14 @@ export function aggregateCorpus(entries) {
     outcomeSignal,
     findings,
     outliers: {
-      highest: sortedByIndex[0],
-      lowest: sortedByIndex[sortedByIndex.length - 1],
-      mostPersonalized: [...entries].sort((a, b) => b.personalization - a.personalization)[0],
-      mostUrgent: [...entries].sort((a, b) => b.urgency - a.urgency)[0],
+      highest: pickBy("compositeIndex", 1),
+      lowest: pickBy("compositeIndex", -1),
+      mostPersonalized: pickBy("personalization", 1),
+      mostUrgent: pickBy("urgency", 1),
     },
   };
 }
+
 
 /* ------------------------------------------------------------
    CAMPAIGN COMPARISON
