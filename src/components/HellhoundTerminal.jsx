@@ -987,15 +987,16 @@ export default function HellhoundTerminal() {
 
         {/* MODE SWITCH */}
         <div className="flex items-center gap-1 mb-4 p-1 rounded-2xl bg-white/[0.03] border border-white/5 w-fit">
-          <ModeTab active={mode === "single"} onClick={() => setMode("single")} icon={FileText}>
-            Single sample
-          </ModeTab>
           <ModeTab active={mode === "corpus"} onClick={() => setMode("corpus")} icon={Layers}>
             Corpus
           </ModeTab>
           <ModeTab active={mode === "compare"} onClick={() => setMode("compare")} icon={GitCompare}>
-            Campaign A/B
+            Campaigns
           </ModeTab>
+          <ModeTab active={mode === "single"} onClick={() => setMode("single")} icon={FileText}>
+            Single sample
+          </ModeTab>
+
         </div>
 
         {/* ============ SINGLE SAMPLE ============ */}
