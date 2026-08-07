@@ -871,7 +871,13 @@ export function analyzeText(rawText, meta = {}) {
   };
 }
 
-/* Flatten a full analysis into a compact row used by tables and rollups. */
+/* Flatten a full analysis into a compact row used by tables and rollups.
+   The full analysis object is intentionally NOT retained: on a 50k-message
+   corpus that alone is hundreds of megabytes. Only the excerpt, a capped
+   copy of the source text (for export / phrase detection) and the numeric
+   scores survive. */
+const SOURCE_TEXT_CAP = 8000;
+
 export function toEntry(analysis, index = 0) {
   const s = analysis.semantic;
   return {
@@ -881,7 +887,7 @@ export function toEntry(analysis, index = 0) {
     channel: analysis.meta.channel,
     outcome: analysis.meta.outcome,
     excerpt: analysis.excerpt,
-    sourceText: analysis.text,
+    sourceText: analysis.text.slice(0, SOURCE_TEXT_CAP),
 
     compositeIndex: s.composite_index,
     stage: s.attack_cycle_stage,
@@ -901,9 +907,9 @@ export function toEntry(analysis, index = 0) {
     readingGrade: analysis.readability.fkGrade,
     wordCount: analysis.readability.wordCount,
     lexicon: Object.fromEntries(Object.entries(analysis.lexicon).map(([k, v]) => [k, v.hits])),
-    full: analysis,
   };
 }
+
 
 /* Dimensions used for corpus aggregation and campaign comparison. */
 export const DIMENSIONS = [
