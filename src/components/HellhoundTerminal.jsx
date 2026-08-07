@@ -7,7 +7,17 @@ import {
   Radar,
   ResponsiveContainer,
 } from "recharts";
-import { AlertTriangle, Download, Upload, X, FileText, Layers, GitCompare } from "lucide-react";
+import {
+  AlertTriangle,
+  Download,
+  Upload,
+  X,
+  FileText,
+  Layers,
+  GitCompare,
+  Plus,
+  Trash2,
+} from "lucide-react";
 import {
   LEXICON_LABELS,
   CIALDINI_KEYS,
@@ -18,12 +28,13 @@ import {
   OUTCOMES,
   COMPOSITE_WEIGHTS,
   DIMENSIONS,
+  CAMPAIGN_COLORS,
   riskTier,
   analyzeText,
-  analyzeCorpus,
+  analyzeCorpusAsync,
+  ingestFiles,
   aggregateCorpus,
   splitBatchText,
-  messagesFromFiles,
   buildCampaign,
   compareCampaigns,
 } from "@/lib/hellhound-scoring";
@@ -400,40 +411,63 @@ function DistributionHistogram({ buckets }) {
   );
 }
 
-function DeltaRow({ row, nameA, nameB }) {
-  const positive = row.delta > 0;
-  const magnitude = Math.min(100, Math.abs(row.delta) * 2);
+function ComparisonMatrix({ rows, series }) {
   return (
-    <div className="grid grid-cols-[9rem_1fr_4.5rem] items-center gap-3 text-xs py-1.5">
-      <span className="truncate text-zinc-300">{row.label}</span>
-      <div className="flex items-center">
-        <div className="flex-1 flex justify-end">
-          <div
-            className="h-1.5 rounded-l-full bg-gradient-to-l from-sky-400 to-sky-600"
-            style={{ width: positive ? 0 : `${magnitude}%` }}
-          />
-        </div>
-        <div className="w-px h-3 bg-white/15" />
-        <div className="flex-1">
-          <div
-            className="h-1.5 rounded-r-full bg-gradient-to-r from-rose-600 to-rose-400"
-            style={{ width: positive ? `${magnitude}%` : 0 }}
-          />
-        </div>
-      </div>
-      <span
-        className="text-right font-mono tabular-nums text-zinc-400"
-        title={`${nameA}: ${row.a} · ${nameB}: ${row.b}`}
-      >
-        {row.a} / {row.b}
-      </span>
+    <div className="overflow-x-auto -mx-1 px-1">
+      <table className="w-full text-xs">
+        <thead>
+          <tr className="text-zinc-500">
+            <th className="text-left font-normal py-2 pr-3">Dimension</th>
+            {series.map((s) => (
+              <th key={s.key} className="text-right font-normal py-2 pr-3 whitespace-nowrap">
+                <span className="inline-flex items-center gap-1.5">
+                  <span
+                    className="w-2 h-2 rounded-full inline-block"
+                    style={{ background: s.color }}
+                  />
+                  {s.name}
+                </span>
+              </th>
+            ))}
+            <th className="text-right font-normal py-2">Spread</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-white/5">
+          {rows.map((r) => (
+            <tr key={r.key}>
+              <td className="py-1.5 pr-3 text-zinc-400 whitespace-nowrap">{r.label}</td>
+              {r.values.map((v, i) => (
+                <td
+                  key={i}
+                  className={`py-1.5 pr-3 text-right font-mono tabular-nums ${
+                    i === r.maxIndex
+                      ? "text-rose-300"
+                      : i === r.minIndex
+                        ? "text-sky-300"
+                        : "text-zinc-300"
+                  }`}
+                >
+                  {v}
+                </td>
+              ))}
+              <td className="py-1.5 text-right font-mono tabular-nums text-zinc-600">{r.spread}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <p className="text-xs text-zinc-600 mt-2">
+        Crimson marks the highest campaign on a dimension, blue the lowest.
+      </p>
     </div>
   );
 }
 
+const PAGE_SIZE = 100;
+
 function CorpusTable({ entries }) {
   const [sortKey, setSortKey] = useState("compositeIndex");
   const [asc, setAsc] = useState(false);
+  const [page, setPage] = useState(0);
   const cols = [
     { key: "label", label: "Message" },
     { key: "channel", label: "Channel" },
@@ -454,6 +488,10 @@ function CorpusTable({ entries }) {
     return asc ? s : s.reverse();
   }, [entries, sortKey, asc]);
 
+  const pageCount = Math.max(1, Math.ceil(sorted.length / PAGE_SIZE));
+  const current = Math.min(page, pageCount - 1);
+  const rows = sorted.slice(current * PAGE_SIZE, current * PAGE_SIZE + PAGE_SIZE);
+
   return (
     <div className="overflow-x-auto -mx-1 px-1">
       <table className="w-full text-xs">
@@ -468,6 +506,7 @@ function CorpusTable({ entries }) {
                     setSortKey(c.key);
                     setAsc(false);
                   }
+                  setPage(0);
                 }}
                 className={`text-left font-normal py-2 pr-3 cursor-pointer whitespace-nowrap hover:text-zinc-300 ${sortKey === c.key ? "text-rose-300" : ""}`}
               >
@@ -477,7 +516,7 @@ function CorpusTable({ entries }) {
           </tr>
         </thead>
         <tbody className="divide-y divide-white/5">
-          {sorted.slice(0, 200).map((e) => (
+          {rows.map((e) => (
             <tr key={e.id} className="text-zinc-400">
               <td className="py-2 pr-3 max-w-[16rem] truncate text-zinc-300" title={e.excerpt}>
                 {e.label || e.excerpt.slice(0, 40)}
@@ -493,83 +532,140 @@ function CorpusTable({ entries }) {
           ))}
         </tbody>
       </table>
-      {sorted.length > 200 && (
-        <p className="text-xs text-zinc-600 mt-2">Showing first 200 of {sorted.length} rows.</p>
+      {pageCount > 1 && (
+        <div className="flex items-center justify-between mt-3">
+          <span className="text-xs text-zinc-600 font-mono tabular-nums">
+            {current * PAGE_SIZE + 1}–{Math.min(sorted.length, (current + 1) * PAGE_SIZE)} of{" "}
+            {sorted.length.toLocaleString()}
+          </span>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setPage(Math.max(0, current - 1))}
+              disabled={current === 0}
+              className="px-3 py-1 rounded-lg text-xs bg-white/5 text-zinc-300 disabled:opacity-30 hover:bg-white/10 transition-colors"
+            >
+              Prev
+            </button>
+            <span className="text-xs text-zinc-600 font-mono tabular-nums">
+              {current + 1}/{pageCount}
+            </span>
+            <button
+              onClick={() => setPage(Math.min(pageCount - 1, current + 1))}
+              disabled={current >= pageCount - 1}
+              className="px-3 py-1 rounded-lg text-xs bg-white/5 text-zinc-300 disabled:opacity-30 hover:bg-white/10 transition-colors"
+            >
+              Next
+            </button>
+          </div>
+        </div>
       )}
     </div>
   );
 }
 
+function ProgressBar({ label, onCancel }) {
+  return (
+    <div className="mt-3 rounded-2xl border border-white/10 bg-white/[0.02] p-3">
+      <div className="flex items-center justify-between mb-2">
+        <span className="text-xs text-zinc-400 font-mono tabular-nums">{label}</span>
+        {onCancel && (
+          <button
+            onClick={onCancel}
+            className="text-xs text-zinc-500 hover:text-red-400 transition-colors"
+          >
+            Cancel
+          </button>
+        )}
+      </div>
+      <div className="h-1 rounded-full bg-white/5 overflow-hidden">
+        <div className="h-full w-1/3 rounded-full bg-gradient-to-r from-rose-600 to-rose-400 animate-pulse" />
+      </div>
+    </div>
+  );
+}
+
 function CampaignPanel({
-  slot,
+  index,
   campaign,
   draft,
   onDraftChange,
   onFiles,
   onAnalyze,
+  onRemove,
   onClear,
   onDownload,
   error,
-  accent,
+  busy,
+  color,
+  canRemove,
 }) {
   const count = campaign?.entries.length ?? 0;
   return (
     <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-4">
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
-          <span className={`w-2 h-2 rounded-full ${accent}`} />
+          <span className="w-2 h-2 rounded-full" style={{ background: color }} />
           <input
             type="text"
             value={draft.name}
             onChange={(e) => onDraftChange({ ...draft, name: e.target.value })}
-            placeholder={`Campaign ${slot} name`}
+            placeholder={`Campaign ${index + 1} name`}
             className="bg-transparent text-xs font-semibold text-zinc-200 focus:outline-none w-40"
           />
         </div>
-        {count > 0 && (
-          <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3">
+          {count > 0 && (
+            <>
+              <button
+                onClick={onDownload}
+                className="flex items-center gap-1 text-xs text-zinc-400 hover:text-rose-300 transition-colors"
+              >
+                <Download className="w-3.5 h-3.5" /> Save
+              </button>
+              <button
+                onClick={onClear}
+                className="flex items-center gap-1 text-xs text-zinc-500 hover:text-red-400 transition-colors"
+              >
+                <X className="w-3.5 h-3.5" /> Clear
+              </button>
+            </>
+          )}
+          {canRemove && (
             <button
-              onClick={onDownload}
-              className="flex items-center gap-1 text-xs text-zinc-400 hover:text-rose-300 transition-colors"
+              onClick={onRemove}
+              title="Remove campaign slot"
+              className="text-zinc-600 hover:text-red-400 transition-colors"
             >
-              <Download className="w-3.5 h-3.5" /> Save
+              <Trash2 className="w-3.5 h-3.5" />
             </button>
-            <button
-              onClick={onClear}
-              className="flex items-center gap-1 text-xs text-zinc-500 hover:text-red-400 transition-colors"
-            >
-              <X className="w-3.5 h-3.5" /> Clear
-            </button>
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
       <textarea
         value={draft.text}
         onChange={(e) => onDraftChange({ ...draft, text: e.target.value })}
         rows={5}
-        placeholder={`Paste campaign ${slot} messages, separated by a line containing only ---`}
+        placeholder={`Paste ${draft.name || `campaign ${index + 1}`} messages, separated by a line containing only ---`}
         className="w-full bg-black/30 border border-white/10 focus:border-rose-500/50 focus:outline-none rounded-xl p-3 text-xs leading-relaxed text-zinc-200 placeholder-zinc-600 resize-y font-mono transition-colors"
       />
       <div className="mt-2">
-        <BatchDropzone
-          onFiles={onFiles}
-          hint={`Drop campaign ${slot} files (.txt / .csv / .json)`}
-        />
+        <BatchDropzone onFiles={onFiles} hint="Drop campaign files (.txt / .csv / .json / .eml)" />
       </div>
       {error && <p className="text-xs text-red-400 mt-2">{error}</p>}
+      {busy && <ProgressBar label={busy} />}
 
       <div className="flex items-center justify-between mt-3">
         <span className="text-xs text-zinc-600">
           {count > 0
-            ? `${count} messages · ${campaign.summary.channelMix.map((m) => `${m.count} ${m.key.toLowerCase()}`).join(" + ")}`
+            ? `${count.toLocaleString()} messages · ${campaign.summary.channelMix.map((m) => `${m.count} ${m.key.toLowerCase()}`).join(" + ")}`
             : "No messages loaded"}
         </span>
         <button
           onClick={onAnalyze}
           className="px-4 py-1.5 rounded-xl text-xs font-semibold bg-white/5 hover:bg-white/10 text-zinc-200 transition-colors"
         >
-          Score campaign {slot}
+          Score campaign
         </button>
       </div>
     </div>
@@ -580,8 +676,17 @@ function CampaignPanel({
    MAIN COMPONENT
    ============================================================ */
 
+let slotSeq = 0;
+const newSlot = (name) => ({
+  id: `slot-${++slotSeq}`,
+  draft: { name: name || `Campaign ${slotSeq}`, text: "" },
+  campaign: null,
+  error: null,
+  busy: null,
+});
+
 export default function HellhoundTerminal() {
-  const [mode, setMode] = useState("single");
+  const [mode, setMode] = useState("corpus");
   const [now, setNow] = useState(null);
 
   // Single sample
@@ -595,14 +700,11 @@ export default function HellhoundTerminal() {
   const [corpusText, setCorpusText] = useState("");
   const [corpusEntries, setCorpusEntries] = useState([]);
   const [corpusError, setCorpusError] = useState(null);
+  const [corpusBusy, setCorpusBusy] = useState(null);
+  const corpusAbort = useRef(null);
 
-  // Campaign A/B
-  const [draftA, setDraftA] = useState({ name: "Campaign A", text: "" });
-  const [draftB, setDraftB] = useState({ name: "Campaign B", text: "" });
-  const [campaignA, setCampaignA] = useState(null);
-  const [campaignB, setCampaignB] = useState(null);
-  const [errorA, setErrorA] = useState(null);
-  const [errorB, setErrorB] = useState(null);
+  // Campaigns — an unbounded list of slots, compared all at once.
+  const [slots, setSlots] = useState(() => [newSlot("Campaign 1"), newSlot("Campaign 2")]);
 
   /* Everything above lives in React memory only. No localStorage, no
      sessionStorage, no cookies, no server, no database. Reloading the tab
@@ -650,34 +752,46 @@ export default function HellhoundTerminal() {
 
   /* ---------- corpus ---------- */
 
-  const runCorpus = useCallback((messages) => {
-    const scored = analyzeCorpus(messages);
-    if (!scored.length) {
-      setCorpusError("No readable messages found.");
-      return;
-    }
-    setCorpusError(null);
-    setCorpusEntries(scored);
-  }, []);
-
-  const handleCorpusPaste = useCallback(() => {
+  const handleCorpusPaste = useCallback(async () => {
     const chunks = splitBatchText(corpusText);
     if (!chunks.length) {
       setCorpusError("Paste at least one message.");
       return;
     }
-    runCorpus(chunks.map((t, i) => ({ text: t, label: `pasted-${i + 1}` })));
-  }, [corpusText, runCorpus]);
+    setCorpusError(null);
+    setCorpusBusy("Scoring 0 messages…");
+    const scored = await analyzeCorpusAsync(
+      chunks.map((t, i) => ({ text: t, label: `pasted-${i + 1}` })),
+      { onProgress: ({ done }) => setCorpusBusy(`Scoring ${done.toLocaleString()} messages…`) },
+    );
+    setCorpusBusy(null);
+    if (!scored.length) setCorpusError("No readable messages found.");
+    else setCorpusEntries(scored);
+  }, [corpusText]);
 
-  const handleCorpusFiles = useCallback(
-    async (fileList) => {
-      const { messages, failed } = await messagesFromFiles(fileList);
+  const handleCorpusFiles = useCallback(async (fileList) => {
+    const controller = new AbortController();
+    corpusAbort.current = controller;
+    setCorpusError(null);
+    setCorpusBusy("Reading files…");
+    try {
+      const { entries, failed } = await ingestFiles(fileList, {
+        signal: controller.signal,
+        onProgress: ({ done, file }) =>
+          setCorpusBusy(`Scored ${done.toLocaleString()} messages · ${file}`),
+      });
       if (failed.length) setCorpusError(`Could not read: ${failed.join(", ")}`);
-      if (messages.length) runCorpus(messages);
+      if (entries.length) setCorpusEntries(entries);
       else if (!failed.length) setCorpusError("No readable messages found.");
-    },
-    [runCorpus],
-  );
+    } catch (err) {
+      setCorpusError(`Ingest failed: ${err?.message || "unknown error"}`);
+    } finally {
+      setCorpusBusy(null);
+      corpusAbort.current = null;
+    }
+  }, []);
+
+  const cancelCorpus = useCallback(() => corpusAbort.current?.abort(), []);
 
   const corpusSummary = useMemo(() => aggregateCorpus(corpusEntries), [corpusEntries]);
 
@@ -699,58 +813,66 @@ export default function HellhoundTerminal() {
     );
   }, [corpusEntries, corpusSummary]);
 
-  const handleSendCorpusTo = useCallback(
-    (slot) => {
-      if (!corpusEntries.length) return;
-      const campaign = buildCampaign(slot === "A" ? draftA.name : draftB.name, corpusEntries);
-      if (slot === "A") setCampaignA(campaign);
-      else setCampaignB(campaign);
-      setMode("compare");
-    },
-    [corpusEntries, draftA.name, draftB.name],
-  );
-
   /* ---------- campaigns ---------- */
 
+  const patchSlot = useCallback((id, patch) => {
+    setSlots((prev) => prev.map((s) => (s.id === id ? { ...s, ...patch } : s)));
+  }, []);
+
+  const addSlot = useCallback(() => {
+    setSlots((prev) => [...prev, newSlot(`Campaign ${prev.length + 1}`)]);
+  }, []);
+
+  const removeSlot = useCallback((id) => {
+    setSlots((prev) => (prev.length <= 1 ? prev : prev.filter((s) => s.id !== id)));
+  }, []);
+
   const scoreCampaign = useCallback(
-    (slot) => {
-      const draft = slot === "A" ? draftA : draftB;
-      const setErr = slot === "A" ? setErrorA : setErrorB;
-      const chunks = splitBatchText(draft.text);
+    async (id) => {
+      const slot = slots.find((s) => s.id === id);
+      if (!slot) return;
+      const chunks = splitBatchText(slot.draft.text);
       if (!chunks.length) {
-        setErr("Paste messages or drop files first.");
+        patchSlot(id, { error: "Paste messages or drop files first." });
         return;
       }
-      setErr(null);
-      const entries = analyzeCorpus(
-        chunks.map((t, i) => ({ text: t, label: `${draft.name}-${i + 1}` })),
+      patchSlot(id, { error: null, busy: "Scoring…" });
+      const entries = await analyzeCorpusAsync(
+        chunks.map((t, i) => ({ text: t, label: `${slot.draft.name}-${i + 1}` })),
+        {
+          onProgress: ({ done }) =>
+            patchSlot(id, { busy: `Scored ${done.toLocaleString()} messages…` }),
+        },
       );
-      const campaign = buildCampaign(draft.name, entries);
-      if (slot === "A") setCampaignA(campaign);
-      else setCampaignB(campaign);
+      patchSlot(id, { busy: null, campaign: buildCampaign(slot.draft.name, entries) });
     },
-    [draftA, draftB],
+    [slots, patchSlot],
   );
 
   const loadCampaignFiles = useCallback(
-    async (slot, fileList) => {
-      const setErr = slot === "A" ? setErrorA : setErrorB;
-      const draft = slot === "A" ? draftA : draftB;
-      const { messages, failed } = await messagesFromFiles(fileList);
-      if (failed.length) setErr(`Could not read: ${failed.join(", ")}`);
-      if (!messages.length) return;
-      setErr(null);
-      const entries = analyzeCorpus(messages);
-      const campaign = buildCampaign(draft.name, entries);
-      if (slot === "A") setCampaignA(campaign);
-      else setCampaignB(campaign);
+    async (id, fileList) => {
+      const slot = slots.find((s) => s.id === id);
+      if (!slot) return;
+      patchSlot(id, { error: null, busy: "Reading files…" });
+      try {
+        const { entries, failed } = await ingestFiles(fileList, {
+          onProgress: ({ done, file }) =>
+            patchSlot(id, { busy: `Scored ${done.toLocaleString()} messages · ${file}` }),
+        });
+        if (failed.length) patchSlot(id, { error: `Could not read: ${failed.join(", ")}` });
+        if (entries.length)
+          patchSlot(id, { campaign: buildCampaign(slot.draft.name, entries), busy: null });
+        else patchSlot(id, { busy: null });
+      } catch (err) {
+        patchSlot(id, { busy: null, error: `Ingest failed: ${err?.message || "unknown error"}` });
+      }
     },
-    [draftA, draftB],
+    [slots, patchSlot],
   );
 
   const downloadCampaign = useCallback(
-    (slot) => {
-      const campaign = slot === "A" ? campaignA : campaignB;
+    (id) => {
+      const campaign = slots.find((s) => s.id === id)?.campaign;
       if (!campaign) return;
       downloadJSON(
         {
@@ -768,10 +890,25 @@ export default function HellhoundTerminal() {
         `hellhound-campaign-${campaign.name.replace(/\s+/g, "-").toLowerCase()}.json`,
       );
     },
-    [campaignA, campaignB],
+    [slots],
   );
 
-  const comparison = useMemo(() => compareCampaigns(campaignA, campaignB), [campaignA, campaignB]);
+  const handleSendCorpusTo = useCallback(() => {
+    if (!corpusEntries.length) return;
+    setSlots((prev) => {
+      const target = prev.find((s) => !s.campaign);
+      const name = target?.draft.name || `Campaign ${prev.length + 1}`;
+      const campaign = buildCampaign(name, corpusEntries);
+      if (target) return prev.map((s) => (s.id === target.id ? { ...s, campaign } : s));
+      return [...prev, { ...newSlot(name), campaign }];
+    });
+    setMode("compare");
+  }, [corpusEntries]);
+
+  const comparison = useMemo(
+    () => compareCampaigns(slots.map((s) => s.campaign).filter(Boolean)),
+    [slots],
+  );
 
   /* ---------- derived (single) ---------- */
 
@@ -845,14 +982,14 @@ export default function HellhoundTerminal() {
 
         {/* MODE SWITCH */}
         <div className="flex items-center gap-1 mb-4 p-1 rounded-2xl bg-white/[0.03] border border-white/5 w-fit">
-          <ModeTab active={mode === "single"} onClick={() => setMode("single")} icon={FileText}>
-            Single sample
-          </ModeTab>
           <ModeTab active={mode === "corpus"} onClick={() => setMode("corpus")} icon={Layers}>
             Corpus
           </ModeTab>
           <ModeTab active={mode === "compare"} onClick={() => setMode("compare")} icon={GitCompare}>
-            Campaign A/B
+            Campaigns
+          </ModeTab>
+          <ModeTab active={mode === "single"} onClick={() => setMode("single")} icon={FileText}>
+            Single sample
           </ModeTab>
         </div>
 
@@ -1122,9 +1259,10 @@ export default function HellhoundTerminal() {
               <div className="mt-3">
                 <BatchDropzone
                   onFiles={handleCorpusFiles}
-                  hint="Drop .txt / .csv / .json message files (CSV columns: text, channel, outcome, label)"
+                  hint="Drop .txt / .csv / .json / .eml files — large CSVs are streamed, no size cap (CSV columns: text, channel, outcome, label)"
                 />
               </div>
+              {corpusBusy && <ProgressBar label={corpusBusy} onCancel={cancelCorpus} />}
               {corpusError && (
                 <div className="border border-red-500/20 bg-red-500/5 rounded-2xl p-3 mt-3 flex items-start gap-2">
                   <AlertTriangle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
@@ -1137,7 +1275,8 @@ export default function HellhoundTerminal() {
                 </span>
                 <button
                   onClick={handleCorpusPaste}
-                  className="px-6 py-2.5 bg-gradient-to-r from-rose-600 to-rose-500 hover:from-rose-500 hover:to-rose-400 text-white font-semibold text-xs rounded-xl transition-all shadow-lg shadow-rose-950/40"
+                  disabled={!!corpusBusy}
+                  className="px-6 py-2.5 bg-gradient-to-r from-rose-600 to-rose-500 hover:from-rose-500 hover:to-rose-400 disabled:opacity-40 text-white font-semibold text-xs rounded-xl transition-all shadow-lg shadow-rose-950/40"
                 >
                   Score corpus
                 </button>
@@ -1155,18 +1294,13 @@ export default function HellhoundTerminal() {
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <button
-                      onClick={() => handleSendCorpusTo("A")}
+                      onClick={handleSendCorpusTo}
                       className="text-xs text-zinc-400 hover:text-rose-300 transition-colors"
                     >
-                      Send to campaign A
-                    </button>
-                    <button
-                      onClick={() => handleSendCorpusTo("B")}
-                      className="text-xs text-zinc-400 hover:text-rose-300 transition-colors"
-                    >
-                      Send to campaign B
+                      Send to a campaign slot
                     </button>
                   </div>
+
                   <div className="flex items-center gap-3">
                     <button
                       onClick={handleDownloadCorpus}
@@ -1362,68 +1496,65 @@ export default function HellhoundTerminal() {
           </div>
         )}
 
-        {/* ============ CAMPAIGN A/B ============ */}
+        {/* ============ CAMPAIGN COMPARISON ============ */}
         {mode === "compare" && (
           <div className="space-y-4">
             <Card>
-              <SectionLabel sub="Load two whole campaigns — any mix of channels and volumes — and compare their construction against each other.">
+              <SectionLabel sub="Load as many campaigns as you like — any mix of channels and volumes — and cross-analyse their construction against each other.">
                 Campaign comparison
               </SectionLabel>
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                <CampaignPanel
-                  slot="A"
-                  accent="bg-sky-400"
-                  campaign={campaignA}
-                  draft={draftA}
-                  onDraftChange={setDraftA}
-                  onFiles={(f) => loadCampaignFiles("A", f)}
-                  onAnalyze={() => scoreCampaign("A")}
-                  onClear={() => setCampaignA(null)}
-                  onDownload={() => downloadCampaign("A")}
-                  error={errorA}
-                />
-                <CampaignPanel
-                  slot="B"
-                  accent="bg-rose-400"
-                  campaign={campaignB}
-                  draft={draftB}
-                  onDraftChange={setDraftB}
-                  onFiles={(f) => loadCampaignFiles("B", f)}
-                  onAnalyze={() => scoreCampaign("B")}
-                  onClear={() => setCampaignB(null)}
-                  onDownload={() => downloadCampaign("B")}
-                  error={errorB}
-                />
+                {slots.map((s, i) => (
+                  <CampaignPanel
+                    key={s.id}
+                    index={i}
+                    color={CAMPAIGN_COLORS[i % CAMPAIGN_COLORS.length]}
+                    campaign={s.campaign}
+                    draft={s.draft}
+                    error={s.error}
+                    busy={s.busy}
+                    canRemove={slots.length > 1}
+                    onDraftChange={(draft) => patchSlot(s.id, { draft })}
+                    onFiles={(f) => loadCampaignFiles(s.id, f)}
+                    onAnalyze={() => scoreCampaign(s.id)}
+                    onClear={() => patchSlot(s.id, { campaign: null })}
+                    onRemove={() => removeSlot(s.id)}
+                    onDownload={() => downloadCampaign(s.id)}
+                  />
+                ))}
               </div>
+              <button
+                onClick={addSlot}
+                className="mt-4 flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold bg-white/5 hover:bg-white/10 text-zinc-200 transition-colors"
+              >
+                <Plus className="w-3.5 h-3.5" /> Add campaign
+              </button>
             </Card>
 
             {!comparison ? (
               <div className="border border-dashed border-white/10 rounded-3xl p-8 text-center">
                 <p className="text-xs text-zinc-500">
-                  Load and score both campaigns to see the comparison.
+                  Score at least two campaigns to see the cross-analysis.
                 </p>
               </div>
             ) : (
               <>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                  <StatChip label={`${campaignA.name} messages`} value={campaignA.entries.length} />
-                  <StatChip
-                    label={`${campaignA.name} mean index`}
-                    value={campaignA.summary.stats.compositeIndex.mean}
-                  />
-                  <StatChip label={`${campaignB.name} messages`} value={campaignB.entries.length} />
-                  <StatChip
-                    label={`${campaignB.name} mean index`}
-                    value={campaignB.summary.stats.compositeIndex.mean}
-                  />
+                  {comparison.campaigns.map((c, i) => (
+                    <StatChip
+                      key={i}
+                      label={`${c.name} · ${c.entries.length.toLocaleString()} msgs`}
+                      value={c.summary.stats.compositeIndex.mean}
+                    />
+                  ))}
                 </div>
 
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                   <Card watermark>
-                    <SectionLabel sub={`${campaignA.name} in blue · ${campaignB.name} in crimson`}>
-                      Paired profile
+                    <SectionLabel sub={comparison.series.map((s) => s.name).join(" · ")}>
+                      Overlaid profiles
                     </SectionLabel>
-                    <div className="h-64">
+                    <div className="h-72">
                       <ResponsiveContainer width="100%" height="100%">
                         <RadarChart data={comparison.radar} outerRadius="70%">
                           <PolarGrid stroke="rgba(255,255,255,0.08)" />
@@ -1432,35 +1563,26 @@ export default function HellhoundTerminal() {
                             tick={{ fill: "#a1a1aa", fontSize: 9 }}
                           />
                           <PolarRadiusAxis domain={[0, 100]} tick={false} axisLine={false} />
-                          <Radar
-                            name={campaignA.name}
-                            dataKey="A"
-                            stroke="#38bdf8"
-                            fill="#38bdf8"
-                            fillOpacity={0.16}
-                            strokeWidth={2}
-                          />
-                          <Radar
-                            name={campaignB.name}
-                            dataKey="B"
-                            stroke="#fb7185"
-                            fill="#fb7185"
-                            fillOpacity={0.16}
-                            strokeWidth={2}
-                          />
+                          {comparison.series.map((s) => (
+                            <Radar
+                              key={s.key}
+                              name={s.name}
+                              dataKey={s.key}
+                              stroke={s.color}
+                              fill={s.color}
+                              fillOpacity={0.12}
+                              strokeWidth={2}
+                            />
+                          ))}
                         </RadarChart>
                       </ResponsiveContainer>
                     </div>
                   </Card>
                   <Card>
-                    <SectionLabel
-                      sub={`Left bar favours ${campaignA.name}, right bar favours ${campaignB.name}`}
-                    >
-                      Per-dimension delta
+                    <SectionLabel sub="Mean score per campaign on each rubric dimension">
+                      Cross-campaign matrix
                     </SectionLabel>
-                    {comparison.deltas.map((d) => (
-                      <DeltaRow key={d.key} row={d} nameA={campaignA.name} nameB={campaignB.name} />
-                    ))}
+                    <ComparisonMatrix rows={comparison.rows} series={comparison.series} />
                   </Card>
                 </div>
 
@@ -1477,9 +1599,11 @@ export default function HellhoundTerminal() {
                 </Card>
 
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                  {[campaignA, campaignB].map((c, i) => (
+                  {comparison.campaigns.map((c, i) => (
                     <Card key={i}>
-                      <SectionLabel sub={`${c.entries.length} messages`}>{c.name}</SectionLabel>
+                      <SectionLabel sub={`${c.entries.length.toLocaleString()} messages`}>
+                        {c.name}
+                      </SectionLabel>
                       <p className="text-xs text-zinc-500 mb-2">Channel mix</p>
                       <MixBars items={c.summary.channelMix} total={c.entries.length} />
                       <p className="text-xs text-zinc-500 mt-4 mb-2">Pretext mix</p>

@@ -871,7 +871,13 @@ export function analyzeText(rawText, meta = {}) {
   };
 }
 
-/* Flatten a full analysis into a compact row used by tables and rollups. */
+/* Flatten a full analysis into a compact row used by tables and rollups.
+   The full analysis object is intentionally NOT retained: on a 50k-message
+   corpus that alone is hundreds of megabytes. Only the excerpt, a capped
+   copy of the source text (for export / phrase detection) and the numeric
+   scores survive. */
+const SOURCE_TEXT_CAP = 8000;
+
 export function toEntry(analysis, index = 0) {
   const s = analysis.semantic;
   return {
@@ -881,7 +887,7 @@ export function toEntry(analysis, index = 0) {
     channel: analysis.meta.channel,
     outcome: analysis.meta.outcome,
     excerpt: analysis.excerpt,
-    sourceText: analysis.text,
+    sourceText: analysis.text.slice(0, SOURCE_TEXT_CAP),
 
     compositeIndex: s.composite_index,
     stage: s.attack_cycle_stage,
@@ -901,7 +907,6 @@ export function toEntry(analysis, index = 0) {
     readingGrade: analysis.readability.fkGrade,
     wordCount: analysis.readability.wordCount,
     lexicon: Object.fromEntries(Object.entries(analysis.lexicon).map(([k, v]) => [k, v.hits])),
-    full: analysis,
   };
 }
 
@@ -933,57 +938,110 @@ export function splitBatchText(text) {
     .filter((s) => s.length > 0);
 }
 
-function parseCsv(content) {
-  const rows = [];
+/* ---- Streaming CSV ----------------------------------------------------
+   A resumable, chunk-safe CSV parser. Feed it arbitrary slices of a file
+   (quoted fields may span chunk boundaries) and it emits complete rows. */
+function createCsvParser() {
   let field = "";
   let row = [];
   let inQuotes = false;
-  for (let i = 0; i < content.length; i++) {
-    const ch = content[i];
-    if (inQuotes) {
-      if (ch === '"' && content[i + 1] === '"') {
-        field += '"';
-        i++;
-      } else if (ch === '"') inQuotes = false;
-      else field += ch;
-    } else if (ch === '"') inQuotes = true;
-    else if (ch === ",") {
-      row.push(field);
-      field = "";
-    } else if (ch === "\n") {
-      row.push(field);
-      rows.push(row);
-      row = [];
-      field = "";
-    } else if (ch !== "\r") field += ch;
+  let pendingQuote = false; // saw a '"' inside quotes at the very end of a chunk
+
+  function pushRows(chunk, out) {
+    for (let i = 0; i < chunk.length; i++) {
+      const ch = chunk[i];
+      if (pendingQuote) {
+        pendingQuote = false;
+        if (ch === '"') {
+          field += '"';
+          continue;
+        }
+        inQuotes = false;
+        // fall through and process ch as an unquoted character
+      }
+      if (inQuotes) {
+        if (ch === '"') {
+          if (i === chunk.length - 1) {
+            pendingQuote = true;
+          } else if (chunk[i + 1] === '"') {
+            field += '"';
+            i++;
+          } else {
+            inQuotes = false;
+          }
+        } else field += ch;
+      } else if (ch === '"') inQuotes = true;
+      else if (ch === ",") {
+        row.push(field);
+        field = "";
+      } else if (ch === "\n") {
+        row.push(field);
+        if (row.some((c) => c.trim().length)) out.push(row);
+        row = [];
+        field = "";
+      } else if (ch !== "\r") field += ch;
+    }
   }
-  if (field.length || row.length) {
-    row.push(field);
-    rows.push(row);
+
+  return {
+    push(chunk) {
+      const out = [];
+      pushRows(chunk, out);
+      return out;
+    },
+    flush() {
+      const out = [];
+      if (pendingQuote) {
+        pendingQuote = false;
+        inQuotes = false;
+      }
+      if (field.length || row.length) {
+        row.push(field);
+        if (row.some((c) => c.trim().length)) out.push(row);
+        row = [];
+        field = "";
+      }
+      return out;
+    },
+  };
+}
+
+function parseCsv(content) {
+  const p = createCsvParser();
+  return [...p.push(content), ...p.flush()];
+}
+
+function csvHeaderMap(headerRow) {
+  const header = headerRow.map((h) => h.trim().toLowerCase());
+  return {
+    textIdx: header.findIndex((h) => ["text", "body", "message", "content"].includes(h)),
+    channelIdx: header.indexOf("channel"),
+    outcomeIdx: header.indexOf("outcome"),
+    labelIdx: header.findIndex((h) => ["label", "id", "subject", "name"].includes(h)),
+  };
+}
+
+function csvRowToMessage(row, map) {
+  if (map.textIdx === -1) {
+    const text = row.join(" ").trim();
+    return text ? { text } : null;
   }
-  return rows.filter((r) => r.some((c) => c.trim().length));
+  const text = (row[map.textIdx] || "").trim();
+  if (!text) return null;
+  return {
+    text,
+    channel: map.channelIdx > -1 ? (row[map.channelIdx] || "").trim() : undefined,
+    outcome: map.outcomeIdx > -1 ? (row[map.outcomeIdx] || "").trim() : undefined,
+    label: map.labelIdx > -1 ? (row[map.labelIdx] || "").trim() : undefined,
+  };
 }
 
 function messagesFromCsv(content) {
   const rows = parseCsv(content);
   if (!rows.length) return [];
-  const header = rows[0].map((h) => h.trim().toLowerCase());
-  const textIdx = header.findIndex((h) => ["text", "body", "message", "content"].includes(h));
-  if (textIdx === -1) {
-    return rows.map((r) => ({ text: r.join(" ").trim() })).filter((m) => m.text);
-  }
-  const channelIdx = header.indexOf("channel");
-  const outcomeIdx = header.indexOf("outcome");
-  const labelIdx = header.findIndex((h) => ["label", "id", "subject", "name"].includes(h));
-  return rows
-    .slice(1)
-    .map((r) => ({
-      text: (r[textIdx] || "").trim(),
-      channel: channelIdx > -1 ? (r[channelIdx] || "").trim() : undefined,
-      outcome: outcomeIdx > -1 ? (r[outcomeIdx] || "").trim() : undefined,
-      label: labelIdx > -1 ? (r[labelIdx] || "").trim() : undefined,
-    }))
-    .filter((m) => m.text);
+  const map = csvHeaderMap(rows[0]);
+  const body = map.textIdx === -1 ? rows : rows.slice(1);
+  return body.map((r) => csvRowToMessage(r, map)).filter(Boolean);
 }
 
 function messagesFromJson(content) {
@@ -1015,21 +1073,103 @@ function messagesFromJson(content) {
   return single.text ? [single] : [];
 }
 
-/* Reads dropped files into normalized { text, channel, outcome, label } messages. */
+const yieldToUi = () => new Promise((r) => setTimeout(r, 0));
+
+/* Streams a file and calls onMessage for every parsed message, never
+   holding more than one chunk of raw text at a time. */
+async function streamFileMessages(file, onMessage, { signal } = {}) {
+  const name = file.name.toLowerCase();
+  const isCsv = name.endsWith(".csv");
+  const isJson = name.endsWith(".json");
+  let count = 0;
+
+  // JSON must be parsed whole; small files are cheaper read whole too.
+  if (isJson || (!isCsv && file.size < 4 * 1024 * 1024) || !file.stream) {
+    const content = await file.text();
+    const parsed = isJson
+      ? messagesFromJson(content)
+      : isCsv
+        ? messagesFromCsv(content)
+        : splitBatchText(content).map((t) => ({ text: t }));
+    for (const m of parsed) {
+      await onMessage({ label: file.name, ...m });
+      count++;
+    }
+    return count;
+  }
+
+  const reader = file.stream().getReader();
+  const decoder = new TextDecoder("utf-8");
+  const csv = isCsv ? createCsvParser() : null;
+  let headerMap = null;
+  let textTail = "";
+  let sinceYield = 0;
+
+  const handleRows = async (rows) => {
+    for (const row of rows) {
+      if (!headerMap) {
+        headerMap = csvHeaderMap(row);
+        if (headerMap.textIdx !== -1) continue; // header row consumed
+      }
+      const m = csvRowToMessage(row, headerMap);
+      if (m) {
+        await onMessage({ label: file.name, ...m });
+        count++;
+      }
+    }
+  };
+
+  for (;;) {
+    if (signal?.aborted) break;
+    const { done, value } = await reader.read();
+    if (done) break;
+    const chunk = decoder.decode(value, { stream: true });
+    if (csv) await handleRows(csv.push(chunk));
+    else {
+      textTail += chunk;
+      const parts = textTail.split(/^\s*---+\s*$/m);
+      textTail = parts.pop() ?? "";
+      for (const part of parts) {
+        const t = part.trim();
+        if (t) {
+          await onMessage({ label: file.name, text: t });
+          count++;
+        }
+      }
+    }
+    sinceYield += chunk.length;
+    if (sinceYield > 1_000_000) {
+      sinceYield = 0;
+      await yieldToUi();
+    }
+  }
+
+  if (csv) await handleRows(csv.flush());
+  else {
+    const t = textTail.trim();
+    if (t) {
+      await onMessage({ label: file.name, text: t });
+      count++;
+    }
+  }
+  return count;
+}
+
+/* Reads dropped files into normalized { text, channel, outcome, label }
+   messages. Kept for small/simple use; large ingests should use
+   ingestFiles, which scores as it streams. */
 export async function messagesFromFiles(fileList) {
   const files = Array.from(fileList);
   const messages = [];
   const failed = [];
   for (const file of files) {
     try {
-      const content = await file.text();
-      const name = file.name.toLowerCase();
-      let parsed = [];
-      if (name.endsWith(".json")) parsed = messagesFromJson(content);
-      else if (name.endsWith(".csv")) parsed = messagesFromCsv(content);
-      else parsed = splitBatchText(content).map((t) => ({ text: t, label: file.name }));
-      if (!parsed.length) failed.push(file.name);
-      messages.push(...parsed.map((m) => ({ label: file.name, ...m })));
+      let got = 0;
+      await streamFileMessages(file, (m) => {
+        messages.push(m);
+        got++;
+      });
+      if (!got) failed.push(file.name);
     } catch {
       failed.push(file.name);
     }
@@ -1037,19 +1177,76 @@ export async function messagesFromFiles(fileList) {
   return { messages, failed };
 }
 
+function scoreMessage(m, i) {
+  return toEntry(
+    analyzeText(m.text, {
+      label: m.label || `msg-${i + 1}`,
+      channel: CHANNELS.includes(m.channel) ? m.channel : m.channel ? "Other" : "Email",
+      outcome: OUTCOMES.includes(m.outcome) ? m.outcome : "Unknown",
+    }),
+    i,
+  );
+}
+
+/* Synchronous scoring — fine for a handful of messages. */
 export function analyzeCorpus(messages) {
-  return messages
-    .filter((m) => m.text && m.text.trim().length)
-    .map((m, i) =>
-      toEntry(
-        analyzeText(m.text, {
-          label: m.label || `msg-${i + 1}`,
-          channel: CHANNELS.includes(m.channel) ? m.channel : m.channel ? "Other" : "Email",
-          outcome: OUTCOMES.includes(m.outcome) ? m.outcome : "Unknown",
-        }),
-        i,
-      ),
-    );
+  return messages.filter((m) => m.text && m.text.trim().length).map(scoreMessage);
+}
+
+/* Batched scoring that yields to the browser between batches so the UI
+   keeps painting. There is no cap on message count. */
+export async function analyzeCorpusAsync(messages, { onProgress, signal, batchSize = 200 } = {}) {
+  const usable = messages.filter((m) => m.text && m.text.trim().length);
+  const entries = [];
+  for (let i = 0; i < usable.length; i++) {
+    if (signal?.aborted) break;
+    entries.push(scoreMessage(usable[i], i));
+    if ((i + 1) % batchSize === 0) {
+      onProgress?.({ done: i + 1, total: usable.length });
+      await yieldToUi();
+    }
+  }
+  onProgress?.({ done: entries.length, total: usable.length });
+  return entries;
+}
+
+/* Streams files straight into scored entries: raw text is discarded as
+   soon as a message is scored, so a very large CSV never lands in memory
+   as one string. There is no cap on message count. */
+export async function ingestFiles(fileList, { onProgress, signal } = {}) {
+  const files = Array.from(fileList);
+  const entries = [];
+  const failed = [];
+  let index = 0;
+  let sinceYield = 0;
+
+  for (const file of files) {
+    if (signal?.aborted) break;
+    try {
+      let got = 0;
+      await streamFileMessages(
+        file,
+        async (m) => {
+          if (signal?.aborted) return;
+          got++;
+          if (!m.text || !m.text.trim()) return;
+          entries.push(scoreMessage(m, index++));
+          if (++sinceYield >= 200) {
+            sinceYield = 0;
+            onProgress?.({ done: entries.length, file: file.name });
+            await yieldToUi();
+          }
+        },
+        { signal },
+      );
+      if (!got) failed.push(file.name);
+      onProgress?.({ done: entries.length, file: file.name });
+      await yieldToUi();
+    } catch {
+      failed.push(file.name);
+    }
+  }
+  return { entries, failed };
 }
 
 /* ------------------------------------------------------------
@@ -1067,12 +1264,17 @@ function tally(items, keyFn) {
     .sort((a, b) => b.count - a.count);
 }
 
+const PHRASE_WORD_CAP = 120; // words inspected per message
+const PHRASE_MAP_CAP = 120_000; // distinct phrases tracked at once
+const PHRASE_SAMPLE_CAP = 5000; // messages sampled for phrase detection
+
 function shingles(text, n = 5) {
   const words = text
     .toLowerCase()
     .replace(/[^a-z0-9\s]/g, " ")
     .split(/\s+/)
-    .filter(Boolean);
+    .filter(Boolean)
+    .slice(0, PHRASE_WORD_CAP);
   const out = new Set();
   for (let i = 0; i + n <= words.length; i++) out.add(words.slice(i, i + n).join(" "));
   return out;
@@ -1080,12 +1282,16 @@ function shingles(text, n = 5) {
 
 function repeatedPhrases(entries, limit = 6) {
   const counts = new Map();
-  entries.forEach((e) => {
+  // Cap the work: on very large corpora an evenly spaced sample gives the
+  // same recurring-template signal without exploding memory.
+  const step = Math.max(1, Math.ceil(entries.length / PHRASE_SAMPLE_CAP));
+  for (let i = 0; i < entries.length; i += step) {
     // Count a phrase once per message, so repetition means "across messages".
-    shingles(textOf(e)).forEach((s) => {
+    shingles(textOf(entries[i])).forEach((s) => {
+      if (!counts.has(s) && counts.size >= PHRASE_MAP_CAP) return;
       counts.set(s, (counts.get(s) || 0) + 1);
     });
-  });
+  }
   return [...counts.entries()]
     .filter(([, c]) => c > 1)
     .sort((a, b) => b[1] - a[1])
@@ -1101,13 +1307,23 @@ export function aggregateCorpus(entries) {
   if (!entries.length) return null;
   const stats = {};
   DIMENSIONS.forEach((d) => {
-    const values = entries.map((e) => e[d.key] || 0);
+    // Built with a loop, not spread: Math.min(...values) blows the call
+    // stack past ~100k messages.
+    const values = new Array(entries.length);
+    let min = Infinity;
+    let max = -Infinity;
+    for (let i = 0; i < entries.length; i++) {
+      const v = entries[i][d.key] || 0;
+      values[i] = v;
+      if (v < min) min = v;
+      if (v > max) max = v;
+    }
     stats[d.key] = {
       label: d.label,
       mean: Math.round(mean(values) * 10) / 10,
       median: Math.round(median(values) * 10) / 10,
-      min: Math.min(...values),
-      max: Math.max(...values),
+      min,
+      max,
       stdev: Math.round(stdev(values) * 10) / 10,
     };
   });
@@ -1125,7 +1341,9 @@ export function aggregateCorpus(entries) {
     .sort((a, b) => b.count - a.count)
     .slice(0, 12);
 
-  const sortedByIndex = [...entries].sort((a, b) => b.compositeIndex - a.compositeIndex);
+  const pickBy = (key, dir) =>
+    entries.reduce((best, e) => (dir * (e[key] - best[key]) > 0 ? e : best), entries[0]);
+
   const buckets = [0, 0, 0, 0, 0];
   entries.forEach((e) => {
     buckets[Math.min(4, Math.floor(e.compositeIndex / 20))] += 1;
@@ -1169,12 +1387,11 @@ export function aggregateCorpus(entries) {
 
   // Outcome correlation, only when outcomes were supplied.
   const withOutcome = entries.filter((e) => e.outcome && e.outcome !== "Unknown");
-  const succeeded = withOutcome.filter(
-    (e) => e.outcome === "Clicked" || e.outcome === "Credentials Entered",
-  );
+  const isSuccess = (e) => e.outcome === "Clicked" || e.outcome === "Credentials Entered";
+  const succeeded = withOutcome.filter(isSuccess);
   let outcomeSignal = null;
   if (succeeded.length >= 2 && withOutcome.length - succeeded.length >= 2) {
-    const others = withOutcome.filter((e) => !succeeded.includes(e));
+    const others = withOutcome.filter((e) => !isSuccess(e));
     outcomeSignal = DIMENSIONS.map((d) => ({
       label: d.label,
       delta:
@@ -1202,10 +1419,10 @@ export function aggregateCorpus(entries) {
     outcomeSignal,
     findings,
     outliers: {
-      highest: sortedByIndex[0],
-      lowest: sortedByIndex[sortedByIndex.length - 1],
-      mostPersonalized: [...entries].sort((a, b) => b.personalization - a.personalization)[0],
-      mostUrgent: [...entries].sort((a, b) => b.urgency - a.urgency)[0],
+      highest: pickBy("compositeIndex", 1),
+      lowest: pickBy("compositeIndex", -1),
+      mostPersonalized: pickBy("personalization", 1),
+      mostUrgent: pickBy("urgency", 1),
     },
   };
 }
@@ -1222,64 +1439,112 @@ export function buildCampaign(name, entries) {
   };
 }
 
-export function compareCampaigns(a, b) {
-  if (!a?.summary || !b?.summary) return null;
-  const deltas = DIMENSIONS.map((d) => {
-    const av = a.summary.stats[d.key].mean;
-    const bv = b.summary.stats[d.key].mean;
+export const CAMPAIGN_COLORS = [
+  "#fb7185",
+  "#38bdf8",
+  "#facc15",
+  "#4ade80",
+  "#c084fc",
+  "#fb923c",
+  "#2dd4bf",
+  "#f472b6",
+];
+
+/* Compares any number of scored campaigns (2 or more). */
+export function compareCampaigns(campaignList) {
+  const campaigns = (campaignList || []).filter((c) => c?.summary && c.entries?.length);
+  if (campaigns.length < 2) return null;
+
+  const names = campaigns.map((c) => c.name);
+  const rows = DIMENSIONS.map((d) => {
+    const values = campaigns.map((c) => c.summary.stats[d.key].mean);
+    let minI = 0;
+    let maxI = 0;
+    values.forEach((v, i) => {
+      if (v < values[minI]) minI = i;
+      if (v > values[maxI]) maxI = i;
+    });
     return {
       key: d.key,
       label: d.label,
-      a: av,
-      b: bv,
-      delta: Math.round((bv - av) * 10) / 10,
+      values,
+      minIndex: minI,
+      maxIndex: maxI,
+      spread: Math.round((values[maxI] - values[minI]) * 10) / 10,
     };
   });
 
-  const radar = DIMENSIONS.filter((d) => d.key !== "readingGrade").map((d) => ({
-    dimension: d.label,
-    A: a.summary.stats[d.key].mean,
-    B: b.summary.stats[d.key].mean,
+  const radar = DIMENSIONS.filter((d) => d.key !== "readingGrade").map((d) => {
+    const point = { dimension: d.label };
+    campaigns.forEach((c, i) => {
+      point[`c${i}`] = c.summary.stats[d.key].mean;
+    });
+    return point;
+  });
+
+  const series = campaigns.map((c, i) => ({
+    key: `c${i}`,
+    name: c.name,
+    color: CAMPAIGN_COLORS[i % CAMPAIGN_COLORS.length],
   }));
 
   const findings = [];
-  const ci = deltas.find((d) => d.key === "compositeIndex");
+  const ciRow = rows.find((r) => r.key === "compositeIndex");
   findings.push(
-    `${a.name}: ${a.entries.length} messages, mean index ${ci.a}. ${b.name}: ${b.entries.length} messages, mean index ${ci.b}. ` +
-      `${Math.abs(ci.delta) < 2 ? "The two campaigns score within noise of each other." : `${ci.delta > 0 ? b.name : a.name} runs ${Math.abs(ci.delta)} points higher overall.`}`,
+    `${campaigns.length} campaigns compared across ${campaigns.reduce((n, c) => n + c.entries.length, 0)} messages. ` +
+      (ciRow.spread < 2
+        ? "All of them score within noise of each other on the composite index."
+        : `${names[ciRow.maxIndex]} runs highest (${ciRow.values[ciRow.maxIndex]}) and ${names[ciRow.minIndex]} lowest (${ciRow.values[ciRow.minIndex]}), a ${ciRow.spread}-point gap.`),
   );
 
-  [...deltas]
-    .filter((d) => d.key !== "compositeIndex")
-    .sort((x, y) => Math.abs(y.delta) - Math.abs(x.delta))
+  [...rows]
+    .filter((r) => r.key !== "compositeIndex")
+    .sort((a, b) => b.spread - a.spread)
     .slice(0, 3)
-    .forEach((d) => {
-      if (Math.abs(d.delta) >= 3) {
+    .forEach((r) => {
+      if (r.spread >= 3) {
         findings.push(
-          `${d.label}: ${d.delta > 0 ? b.name : a.name} is higher by ${Math.abs(d.delta)} (${d.a} vs ${d.b}).`,
+          `${r.label} separates the set most (spread ${r.spread}): ${names[r.maxIndex]} at ${r.values[r.maxIndex]} vs ${names[r.minIndex]} at ${r.values[r.minIndex]}.`,
         );
       }
     });
 
   const mixLine = (c) =>
     c.summary.channelMix.map((m) => `${m.count} ${m.key.toLowerCase()}`).join(" + ");
-  findings.push(`Channel mix — ${a.name}: ${mixLine(a)}. ${b.name}: ${mixLine(b)}.`);
+  findings.push(`Channel mix — ${campaigns.map((c) => `${c.name}: ${mixLine(c)}`).join("; ")}.`);
 
-  const consistency = (c) => c.summary.stats.compositeIndex.stdev;
+  const sigmas = campaigns.map((c) => c.summary.stats.compositeIndex.stdev);
+  const mostUniform = sigmas.indexOf(Math.min(...sigmas));
+  const leastUniform = sigmas.indexOf(Math.max(...sigmas));
   findings.push(
-    consistency(a) < consistency(b)
-      ? `${a.name} is the more uniform campaign (σ ${consistency(a)} vs ${consistency(b)}).`
-      : `${b.name} is the more uniform campaign (σ ${consistency(b)} vs ${consistency(a)}).`,
+    `${names[mostUniform]} is the most uniform campaign (σ ${sigmas[mostUniform]}); ${names[leastUniform]} the most varied (σ ${sigmas[leastUniform]}).`,
   );
 
-  const sharedPretexts = a.summary.pretextMix
-    .filter((p) => b.summary.pretextMix.some((q) => q.key === p.key))
-    .map((p) => p.key);
+  const shared = campaigns
+    .map((c) => new Set(c.summary.pretextMix.map((p) => p.key)))
+    .reduce(
+      (acc, set) => acc.filter((k) => set.has(k)),
+      [...campaigns[0].summary.pretextMix.map((p) => p.key)],
+    );
   findings.push(
-    sharedPretexts.length
-      ? `Shared pretext families: ${sharedPretexts.join(", ")}.`
-      : "The campaigns share no pretext family.",
+    shared.length
+      ? `Pretext families present in every campaign: ${shared.join(", ")}.`
+      : "No pretext family appears in every campaign.",
   );
 
-  return { deltas, radar, findings };
+  // Largest pairwise gap on the composite index.
+  let gap = { a: 0, b: 1, value: 0 };
+  for (let i = 0; i < campaigns.length; i++) {
+    for (let j = i + 1; j < campaigns.length; j++) {
+      const v = Math.abs(ciRow.values[i] - ciRow.values[j]);
+      if (v > gap.value) gap = { a: i, b: j, value: Math.round(v * 10) / 10 };
+    }
+  }
+  if (gap.value >= 3) {
+    findings.push(
+      `Largest pairwise difference: ${names[gap.a]} vs ${names[gap.b]} at ${gap.value} composite index points.`,
+    );
+  }
+
+  return { campaigns, names, rows, radar, series, findings };
 }
