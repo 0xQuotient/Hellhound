@@ -1445,64 +1445,112 @@ export function buildCampaign(name, entries) {
   };
 }
 
-export function compareCampaigns(a, b) {
-  if (!a?.summary || !b?.summary) return null;
-  const deltas = DIMENSIONS.map((d) => {
-    const av = a.summary.stats[d.key].mean;
-    const bv = b.summary.stats[d.key].mean;
+export const CAMPAIGN_COLORS = [
+  "#fb7185",
+  "#38bdf8",
+  "#facc15",
+  "#4ade80",
+  "#c084fc",
+  "#fb923c",
+  "#2dd4bf",
+  "#f472b6",
+];
+
+/* Compares any number of scored campaigns (2 or more). */
+export function compareCampaigns(campaignList) {
+  const campaigns = (campaignList || []).filter((c) => c?.summary && c.entries?.length);
+  if (campaigns.length < 2) return null;
+
+  const names = campaigns.map((c) => c.name);
+  const rows = DIMENSIONS.map((d) => {
+    const values = campaigns.map((c) => c.summary.stats[d.key].mean);
+    let minI = 0;
+    let maxI = 0;
+    values.forEach((v, i) => {
+      if (v < values[minI]) minI = i;
+      if (v > values[maxI]) maxI = i;
+    });
     return {
       key: d.key,
       label: d.label,
-      a: av,
-      b: bv,
-      delta: Math.round((bv - av) * 10) / 10,
+      values,
+      minIndex: minI,
+      maxIndex: maxI,
+      spread: Math.round((values[maxI] - values[minI]) * 10) / 10,
     };
   });
 
-  const radar = DIMENSIONS.filter((d) => d.key !== "readingGrade").map((d) => ({
-    dimension: d.label,
-    A: a.summary.stats[d.key].mean,
-    B: b.summary.stats[d.key].mean,
+  const radar = DIMENSIONS.filter((d) => d.key !== "readingGrade").map((d) => {
+    const point = { dimension: d.label };
+    campaigns.forEach((c, i) => {
+      point[`c${i}`] = c.summary.stats[d.key].mean;
+    });
+    return point;
+  });
+
+  const series = campaigns.map((c, i) => ({
+    key: `c${i}`,
+    name: c.name,
+    color: CAMPAIGN_COLORS[i % CAMPAIGN_COLORS.length],
   }));
 
   const findings = [];
-  const ci = deltas.find((d) => d.key === "compositeIndex");
+  const ciRow = rows.find((r) => r.key === "compositeIndex");
   findings.push(
-    `${a.name}: ${a.entries.length} messages, mean index ${ci.a}. ${b.name}: ${b.entries.length} messages, mean index ${ci.b}. ` +
-      `${Math.abs(ci.delta) < 2 ? "The two campaigns score within noise of each other." : `${ci.delta > 0 ? b.name : a.name} runs ${Math.abs(ci.delta)} points higher overall.`}`,
+    `${campaigns.length} campaigns compared across ${campaigns.reduce((n, c) => n + c.entries.length, 0)} messages. ` +
+      (ciRow.spread < 2
+        ? "All of them score within noise of each other on the composite index."
+        : `${names[ciRow.maxIndex]} runs highest (${ciRow.values[ciRow.maxIndex]}) and ${names[ciRow.minIndex]} lowest (${ciRow.values[ciRow.minIndex]}), a ${ciRow.spread}-point gap.`),
   );
 
-  [...deltas]
-    .filter((d) => d.key !== "compositeIndex")
-    .sort((x, y) => Math.abs(y.delta) - Math.abs(x.delta))
+  [...rows]
+    .filter((r) => r.key !== "compositeIndex")
+    .sort((a, b) => b.spread - a.spread)
     .slice(0, 3)
-    .forEach((d) => {
-      if (Math.abs(d.delta) >= 3) {
+    .forEach((r) => {
+      if (r.spread >= 3) {
         findings.push(
-          `${d.label}: ${d.delta > 0 ? b.name : a.name} is higher by ${Math.abs(d.delta)} (${d.a} vs ${d.b}).`,
+          `${r.label} separates the set most (spread ${r.spread}): ${names[r.maxIndex]} at ${r.values[r.maxIndex]} vs ${names[r.minIndex]} at ${r.values[r.minIndex]}.`,
         );
       }
     });
 
   const mixLine = (c) =>
     c.summary.channelMix.map((m) => `${m.count} ${m.key.toLowerCase()}`).join(" + ");
-  findings.push(`Channel mix — ${a.name}: ${mixLine(a)}. ${b.name}: ${mixLine(b)}.`);
+  findings.push(`Channel mix — ${campaigns.map((c) => `${c.name}: ${mixLine(c)}`).join("; ")}.`);
 
-  const consistency = (c) => c.summary.stats.compositeIndex.stdev;
+  const sigmas = campaigns.map((c) => c.summary.stats.compositeIndex.stdev);
+  const mostUniform = sigmas.indexOf(Math.min(...sigmas));
+  const leastUniform = sigmas.indexOf(Math.max(...sigmas));
   findings.push(
-    consistency(a) < consistency(b)
-      ? `${a.name} is the more uniform campaign (σ ${consistency(a)} vs ${consistency(b)}).`
-      : `${b.name} is the more uniform campaign (σ ${consistency(b)} vs ${consistency(a)}).`,
+    `${names[mostUniform]} is the most uniform campaign (σ ${sigmas[mostUniform]}); ${names[leastUniform]} the most varied (σ ${sigmas[leastUniform]}).`,
   );
 
-  const sharedPretexts = a.summary.pretextMix
-    .filter((p) => b.summary.pretextMix.some((q) => q.key === p.key))
-    .map((p) => p.key);
+  const shared = campaigns
+    .map((c) => new Set(c.summary.pretextMix.map((p) => p.key)))
+    .reduce((acc, set) => acc.filter((k) => set.has(k)), [
+      ...campaigns[0].summary.pretextMix.map((p) => p.key),
+    ]);
   findings.push(
-    sharedPretexts.length
-      ? `Shared pretext families: ${sharedPretexts.join(", ")}.`
-      : "The campaigns share no pretext family.",
+    shared.length
+      ? `Pretext families present in every campaign: ${shared.join(", ")}.`
+      : "No pretext family appears in every campaign.",
   );
 
-  return { deltas, radar, findings };
+  // Largest pairwise gap on the composite index.
+  let gap = { a: 0, b: 1, value: 0 };
+  for (let i = 0; i < campaigns.length; i++) {
+    for (let j = i + 1; j < campaigns.length; j++) {
+      const v = Math.abs(ciRow.values[i] - ciRow.values[j]);
+      if (v > gap.value) gap = { a: i, b: j, value: Math.round(v * 10) / 10 };
+    }
+  }
+  if (gap.value >= 3) {
+    findings.push(
+      `Largest pairwise difference: ${names[gap.a]} vs ${names[gap.b]} at ${gap.value} composite index points.`,
+    );
+  }
+
+  return { campaigns, names, rows, radar, series, findings };
 }
+
