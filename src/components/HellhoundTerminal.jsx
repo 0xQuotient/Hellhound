@@ -316,43 +316,71 @@ const inputCls =
    MAIN COMPONENT
    ============================================================ */
 
-function BatchDropzone({ onFiles, hint }) {
+function BatchDropzone({ onFiles, hint, files = [], onRemoveFile }) {
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef(null);
 
   return (
-    <div
-      onDragOver={(e) => {
-        e.preventDefault();
-        setIsDragging(true);
-      }}
-      onDragLeave={() => setIsDragging(false)}
-      onDrop={(e) => {
-        e.preventDefault();
-        setIsDragging(false);
-        if (e.dataTransfer.files?.length) onFiles(e.dataTransfer.files);
-      }}
-      onClick={() => fileInputRef.current?.click()}
-      className={`border border-dashed rounded-2xl px-4 py-5 text-center cursor-pointer transition-colors ${isDragging ? "border-rose-500/50 bg-rose-500/5" : "border-white/10 hover:border-white/20"}`}
-    >
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept=".txt,.csv,.json,.eml,.md,text/plain,text/csv,application/json"
-        multiple
-        className="hidden"
-        onChange={(e) => {
-          if (e.target.files?.length) onFiles(e.target.files);
-          e.target.value = "";
+    <div>
+      <div
+        onDragOver={(e) => {
+          e.preventDefault();
+          setIsDragging(true);
         }}
-      />
-      <Upload className="w-4 h-4 text-zinc-600 mx-auto mb-1.5" />
-      <p className="text-xs text-zinc-500">
-        {hint || "Drop .txt / .csv / .json message files here, or click to browse"}
-      </p>
-      <p className="text-xs text-zinc-600 mt-0.5">
-        Read in memory only — nothing is uploaded, nothing is stored
-      </p>
+        onDragLeave={() => setIsDragging(false)}
+        onDrop={(e) => {
+          e.preventDefault();
+          setIsDragging(false);
+          if (e.dataTransfer.files?.length) onFiles(e.dataTransfer.files);
+        }}
+        onClick={() => fileInputRef.current?.click()}
+        className={`border border-dashed rounded-2xl px-4 py-5 text-center cursor-pointer transition-colors ${isDragging ? "border-rose-500/50 bg-rose-500/5" : "border-white/10 hover:border-white/20"}`}
+      >
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".txt,.csv,.tsv,.json,.eml,.md,text/plain,text/csv,application/json"
+          multiple
+          className="hidden"
+          onChange={(e) => {
+            if (e.target.files?.length) onFiles(e.target.files);
+            e.target.value = "";
+          }}
+        />
+        <Upload className="w-4 h-4 text-zinc-600 mx-auto mb-1.5" />
+        <p className="text-xs text-zinc-500">
+          {hint || "Drop .txt / .csv / .json message files here, or click to browse"}
+        </p>
+        <p className="text-xs text-zinc-600 mt-0.5">
+          Queued only — nothing is parsed until you press Analyze, nothing is uploaded or stored
+        </p>
+      </div>
+      {files.length > 0 && (
+        <ul className="mt-2 space-y-1">
+          {files.map((f, i) => (
+            <li
+              key={`${f.name}-${i}`}
+              className="flex items-center justify-between gap-2 rounded-lg bg-white/[0.03] px-3 py-1.5"
+            >
+              <span className="text-xs text-zinc-300 truncate font-mono">{f.name}</span>
+              <span className="flex items-center gap-2 shrink-0">
+                <span className="text-xs text-zinc-600 font-mono tabular-nums">
+                  {(f.size / 1024).toFixed(0)} KB
+                </span>
+                {onRemoveFile && (
+                  <button
+                    onClick={() => onRemoveFile(i)}
+                    className="text-zinc-600 hover:text-red-400 transition-colors"
+                    title="Remove file"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }
@@ -588,8 +616,10 @@ function CampaignPanel({
   index,
   campaign,
   draft,
+  files = [],
   onDraftChange,
   onFiles,
+  onRemoveFile,
   onAnalyze,
   onRemove,
   onClear,
@@ -600,6 +630,7 @@ function CampaignPanel({
   canRemove,
 }) {
   const count = campaign?.entries.length ?? 0;
+  const pending = splitBatchText(draft.text).length + files.length;
   return (
     <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-4">
       <div className="flex items-center justify-between mb-3">
@@ -650,7 +681,12 @@ function CampaignPanel({
         className="w-full bg-black/30 border border-white/10 focus:border-rose-500/50 focus:outline-none rounded-xl p-3 text-xs leading-relaxed text-zinc-200 placeholder-zinc-600 resize-y font-mono transition-colors"
       />
       <div className="mt-2">
-        <BatchDropzone onFiles={onFiles} hint="Drop campaign files (.txt / .csv / .json / .eml)" />
+        <BatchDropzone
+          onFiles={onFiles}
+          files={files}
+          onRemoveFile={onRemoveFile}
+          hint="Queue campaign files (.txt / .csv / .tsv / .json / .eml)"
+        />
       </div>
       {error && <p className="text-xs text-red-400 mt-2">{error}</p>}
       {busy && <ProgressBar label={busy} />}
@@ -659,13 +695,14 @@ function CampaignPanel({
         <span className="text-xs text-zinc-600">
           {count > 0
             ? `${count.toLocaleString()} messages · ${campaign.summary.channelMix.map((m) => `${m.count} ${m.key.toLowerCase()}`).join(" + ")}`
-            : "No messages loaded"}
+            : "No messages analyzed"}
         </span>
         <button
           onClick={onAnalyze}
-          className="px-4 py-1.5 rounded-xl text-xs font-semibold bg-white/5 hover:bg-white/10 text-zinc-200 transition-colors"
+          disabled={!!busy || pending === 0}
+          className="px-4 py-1.5 rounded-xl text-xs font-semibold bg-white/5 hover:bg-white/10 disabled:opacity-30 text-zinc-200 transition-colors"
         >
-          Score campaign
+          Analyze
         </button>
       </div>
     </div>
@@ -680,6 +717,7 @@ let slotSeq = 0;
 const newSlot = (name) => ({
   id: `slot-${++slotSeq}`,
   draft: { name: name || `Campaign ${slotSeq}`, text: "" },
+  files: [],
   campaign: null,
   error: null,
   busy: null,
@@ -698,6 +736,7 @@ export default function HellhoundTerminal() {
 
   // Corpus
   const [corpusText, setCorpusText] = useState("");
+  const [corpusFiles, setCorpusFiles] = useState([]);
   const [corpusEntries, setCorpusEntries] = useState([]);
   const [corpusError, setCorpusError] = useState(null);
   const [corpusBusy, setCorpusBusy] = useState(null);
@@ -752,43 +791,61 @@ export default function HellhoundTerminal() {
 
   /* ---------- corpus ---------- */
 
-  const handleCorpusPaste = useCallback(async () => {
+  /* Nothing is parsed or scored on drop — everything happens here, when
+     the operator presses Analyze. */
+  const handleCorpusAnalyze = useCallback(async () => {
     const chunks = splitBatchText(corpusText);
-    if (!chunks.length) {
-      setCorpusError("Paste at least one message.");
+    if (!chunks.length && !corpusFiles.length) {
+      setCorpusError("Paste messages or queue files first.");
       return;
     }
-    setCorpusError(null);
-    setCorpusBusy("Scoring 0 messages…");
-    const scored = await analyzeCorpusAsync(
-      chunks.map((t, i) => ({ text: t, label: `pasted-${i + 1}` })),
-      { onProgress: ({ done }) => setCorpusBusy(`Scoring ${done.toLocaleString()} messages…`) },
-    );
-    setCorpusBusy(null);
-    if (!scored.length) setCorpusError("No readable messages found.");
-    else setCorpusEntries(scored);
-  }, [corpusText]);
-
-  const handleCorpusFiles = useCallback(async (fileList) => {
     const controller = new AbortController();
     corpusAbort.current = controller;
     setCorpusError(null);
-    setCorpusBusy("Reading files…");
+    setCorpusBusy("Analyzing…");
     try {
-      const { entries, failed } = await ingestFiles(fileList, {
-        signal: controller.signal,
-        onProgress: ({ done, file }) =>
-          setCorpusBusy(`Scored ${done.toLocaleString()} messages · ${file}`),
-      });
+      const collected = [];
+      if (chunks.length) {
+        const scored = await analyzeCorpusAsync(
+          chunks.map((t, i) => ({ text: t, label: `pasted-${i + 1}` })),
+          {
+            signal: controller.signal,
+            onProgress: ({ done }) => setCorpusBusy(`Analyzed ${done.toLocaleString()} messages…`),
+          },
+        );
+        collected.push(...scored);
+      }
+      let failed = [];
+      if (corpusFiles.length) {
+        const base = collected.length;
+        const res = await ingestFiles(corpusFiles, {
+          signal: controller.signal,
+          onProgress: ({ done, file }) =>
+            setCorpusBusy(`Analyzed ${(base + done).toLocaleString()} messages · ${file}`),
+        });
+        collected.push(...res.entries);
+        failed = res.failed;
+      }
       if (failed.length) setCorpusError(`Could not read: ${failed.join(", ")}`);
-      if (entries.length) setCorpusEntries(entries);
+      if (collected.length) setCorpusEntries(collected);
       else if (!failed.length) setCorpusError("No readable messages found.");
     } catch (err) {
-      setCorpusError(`Ingest failed: ${err?.message || "unknown error"}`);
+      setCorpusError(`Analysis failed: ${err?.message || "unknown error"}`);
     } finally {
       setCorpusBusy(null);
       corpusAbort.current = null;
     }
+  }, [corpusText, corpusFiles]);
+
+  const queueCorpusFiles = useCallback((fileList) => {
+    // Snapshot the FileList now: the input is reset before the state updater runs.
+    const added = Array.from(fileList);
+    setCorpusError(null);
+    setCorpusFiles((prev) => [...prev, ...added]);
+  }, []);
+
+  const removeCorpusFile = useCallback((i) => {
+    setCorpusFiles((prev) => prev.filter((_, idx) => idx !== i));
   }, []);
 
   const cancelCorpus = useCallback(() => corpusAbort.current?.abort(), []);
@@ -832,43 +889,60 @@ export default function HellhoundTerminal() {
       const slot = slots.find((s) => s.id === id);
       if (!slot) return;
       const chunks = splitBatchText(slot.draft.text);
-      if (!chunks.length) {
-        patchSlot(id, { error: "Paste messages or drop files first." });
+      const files = slot.files || [];
+      if (!chunks.length && !files.length) {
+        patchSlot(id, { error: "Paste messages or queue files first." });
         return;
       }
-      patchSlot(id, { error: null, busy: "Scoring…" });
-      const entries = await analyzeCorpusAsync(
-        chunks.map((t, i) => ({ text: t, label: `${slot.draft.name}-${i + 1}` })),
-        {
-          onProgress: ({ done }) =>
-            patchSlot(id, { busy: `Scored ${done.toLocaleString()} messages…` }),
-        },
-      );
-      patchSlot(id, { busy: null, campaign: buildCampaign(slot.draft.name, entries) });
+      patchSlot(id, { error: null, busy: "Analyzing…" });
+      try {
+        const entries = [];
+        if (chunks.length) {
+          const scored = await analyzeCorpusAsync(
+            chunks.map((t, i) => ({ text: t, label: `${slot.draft.name}-${i + 1}` })),
+            {
+              onProgress: ({ done }) =>
+                patchSlot(id, { busy: `Analyzed ${done.toLocaleString()} messages…` }),
+            },
+          );
+          entries.push(...scored);
+        }
+        let failed = [];
+        if (files.length) {
+          const base = entries.length;
+          const res = await ingestFiles(files, {
+            onProgress: ({ done, file }) =>
+              patchSlot(id, {
+                busy: `Analyzed ${(base + done).toLocaleString()} messages · ${file}`,
+              }),
+          });
+          entries.push(...res.entries);
+          failed = res.failed;
+        }
+        patchSlot(id, {
+          busy: null,
+          error: failed.length ? `Could not read: ${failed.join(", ")}` : null,
+          campaign: entries.length ? buildCampaign(slot.draft.name, entries) : slot.campaign,
+        });
+      } catch (err) {
+        patchSlot(id, { busy: null, error: `Analysis failed: ${err?.message || "unknown error"}` });
+      }
     },
     [slots, patchSlot],
   );
 
-  const loadCampaignFiles = useCallback(
-    async (id, fileList) => {
-      const slot = slots.find((s) => s.id === id);
-      if (!slot) return;
-      patchSlot(id, { error: null, busy: "Reading files…" });
-      try {
-        const { entries, failed } = await ingestFiles(fileList, {
-          onProgress: ({ done, file }) =>
-            patchSlot(id, { busy: `Scored ${done.toLocaleString()} messages · ${file}` }),
-        });
-        if (failed.length) patchSlot(id, { error: `Could not read: ${failed.join(", ")}` });
-        if (entries.length)
-          patchSlot(id, { campaign: buildCampaign(slot.draft.name, entries), busy: null });
-        else patchSlot(id, { busy: null });
-      } catch (err) {
-        patchSlot(id, { busy: null, error: `Ingest failed: ${err?.message || "unknown error"}` });
-      }
-    },
-    [slots, patchSlot],
-  );
+  const queueCampaignFiles = useCallback((id, fileList) => {
+    const added = Array.from(fileList);
+    setSlots((prev) =>
+      prev.map((s) => (s.id === id ? { ...s, error: null, files: [...s.files, ...added] } : s)),
+    );
+  }, []);
+
+  const removeCampaignFile = useCallback((id, i) => {
+    setSlots((prev) =>
+      prev.map((s) => (s.id === id ? { ...s, files: s.files.filter((_, idx) => idx !== i) } : s)),
+    );
+  }, []);
 
   const downloadCampaign = useCallback(
     (id) => {
@@ -1043,7 +1117,7 @@ export default function HellhoundTerminal() {
                   disabled={!inputText.trim()}
                   className="flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-rose-600 to-rose-500 hover:from-rose-500 hover:to-rose-400 disabled:from-white/5 disabled:to-white/5 disabled:text-zinc-600 text-white font-semibold text-xs rounded-xl transition-all shadow-lg shadow-rose-950/40"
                 >
-                  Run analysis
+                  Analyze
                 </button>
               </div>
             </Card>
@@ -1258,8 +1332,10 @@ export default function HellhoundTerminal() {
               />
               <div className="mt-3">
                 <BatchDropzone
-                  onFiles={handleCorpusFiles}
-                  hint="Drop .txt / .csv / .json / .eml files — large CSVs are streamed, no size cap (CSV columns: text, channel, outcome, label)"
+                  onFiles={queueCorpusFiles}
+                  files={corpusFiles}
+                  onRemoveFile={removeCorpusFile}
+                  hint="Queue .txt / .csv / .tsv / .json / .eml files — large CSVs are streamed, no size cap (columns auto-detected: text/body/message, channel, outcome, label)"
                 />
               </div>
               {corpusBusy && <ProgressBar label={corpusBusy} onCancel={cancelCorpus} />}
@@ -1271,14 +1347,17 @@ export default function HellhoundTerminal() {
               )}
               <div className="flex items-center justify-between mt-4">
                 <span className="text-xs text-zinc-600 font-mono tabular-nums">
-                  {splitBatchText(corpusText).length} pasted messages
+                  {splitBatchText(corpusText).length} pasted messages · {corpusFiles.length} file
+                  {corpusFiles.length === 1 ? "" : "s"} queued
                 </span>
                 <button
-                  onClick={handleCorpusPaste}
-                  disabled={!!corpusBusy}
+                  onClick={handleCorpusAnalyze}
+                  disabled={
+                    !!corpusBusy || (!splitBatchText(corpusText).length && !corpusFiles.length)
+                  }
                   className="px-6 py-2.5 bg-gradient-to-r from-rose-600 to-rose-500 hover:from-rose-500 hover:to-rose-400 disabled:opacity-40 text-white font-semibold text-xs rounded-xl transition-all shadow-lg shadow-rose-950/40"
                 >
-                  Score corpus
+                  Analyze
                 </button>
               </div>
             </Card>
@@ -1515,9 +1594,11 @@ export default function HellhoundTerminal() {
                     busy={s.busy}
                     canRemove={slots.length > 1}
                     onDraftChange={(draft) => patchSlot(s.id, { draft })}
-                    onFiles={(f) => loadCampaignFiles(s.id, f)}
+                    files={s.files}
+                    onFiles={(f) => queueCampaignFiles(s.id, f)}
+                    onRemoveFile={(i2) => removeCampaignFile(s.id, i2)}
                     onAnalyze={() => scoreCampaign(s.id)}
-                    onClear={() => patchSlot(s.id, { campaign: null })}
+                    onClear={() => patchSlot(s.id, { campaign: null, files: [] })}
                     onRemove={() => removeSlot(s.id)}
                     onDownload={() => downloadCampaign(s.id)}
                   />
