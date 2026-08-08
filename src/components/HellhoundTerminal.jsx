@@ -1333,8 +1333,10 @@ export default function HellhoundTerminal() {
               />
               <div className="mt-3">
                 <BatchDropzone
-                  onFiles={handleCorpusFiles}
-                  hint="Drop .txt / .csv / .json / .eml files — large CSVs are streamed, no size cap (CSV columns: text, channel, outcome, label)"
+                  onFiles={queueCorpusFiles}
+                  files={corpusFiles}
+                  onRemoveFile={removeCorpusFile}
+                  hint="Queue .txt / .csv / .tsv / .json / .eml files — large CSVs are streamed, no size cap (columns auto-detected: text/body/message, channel, outcome, label)"
                 />
               </div>
               {corpusBusy && <ProgressBar label={corpusBusy} onCancel={cancelCorpus} />}
@@ -1346,14 +1348,15 @@ export default function HellhoundTerminal() {
               )}
               <div className="flex items-center justify-between mt-4">
                 <span className="text-xs text-zinc-600 font-mono tabular-nums">
-                  {splitBatchText(corpusText).length} pasted messages
+                  {splitBatchText(corpusText).length} pasted messages · {corpusFiles.length} file
+                  {corpusFiles.length === 1 ? "" : "s"} queued
                 </span>
                 <button
-                  onClick={handleCorpusPaste}
-                  disabled={!!corpusBusy}
+                  onClick={handleCorpusAnalyze}
+                  disabled={!!corpusBusy || (!splitBatchText(corpusText).length && !corpusFiles.length)}
                   className="px-6 py-2.5 bg-gradient-to-r from-rose-600 to-rose-500 hover:from-rose-500 hover:to-rose-400 disabled:opacity-40 text-white font-semibold text-xs rounded-xl transition-all shadow-lg shadow-rose-950/40"
                 >
-                  Score corpus
+                  Analyze
                 </button>
               </div>
             </Card>
