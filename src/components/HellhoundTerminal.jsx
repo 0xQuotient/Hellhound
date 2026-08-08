@@ -718,6 +718,7 @@ let slotSeq = 0;
 const newSlot = (name) => ({
   id: `slot-${++slotSeq}`,
   draft: { name: name || `Campaign ${slotSeq}`, text: "" },
+  files: [],
   campaign: null,
   error: null,
   busy: null,
@@ -736,6 +737,7 @@ export default function HellhoundTerminal() {
 
   // Corpus
   const [corpusText, setCorpusText] = useState("");
+  const [corpusFiles, setCorpusFiles] = useState([]);
   const [corpusEntries, setCorpusEntries] = useState([]);
   const [corpusError, setCorpusError] = useState(null);
   const [corpusBusy, setCorpusBusy] = useState(null);
