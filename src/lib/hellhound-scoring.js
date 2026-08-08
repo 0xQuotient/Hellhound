@@ -1181,13 +1181,16 @@ const yieldToUi = () => new Promise((r) => setTimeout(r, 0));
    holding more than one chunk of raw text at a time. */
 async function streamFileMessages(file, onMessage, { signal } = {}) {
   const name = file.name.toLowerCase();
-  const isCsv = name.endsWith(".csv");
   const isJson = name.endsWith(".json");
+  let isCsv = /\.(csv|tsv|psv)$/.test(name);
+  let delimiter = name.endsWith(".tsv") ? "\t" : name.endsWith(".psv") ? "|" : null;
   let count = 0;
 
   // JSON must be parsed whole; small files are cheaper read whole too.
   if (isJson || (!isCsv && file.size < 4 * 1024 * 1024) || !file.stream) {
     const content = await file.text();
+    // A tabular file without a .csv extension is still tabular: sniff it.
+    if (!isJson && !isCsv && looksTabular(content)) isCsv = true;
     const parsed = isJson
       ? messagesFromJson(content)
       : isCsv
@@ -1202,24 +1205,18 @@ async function streamFileMessages(file, onMessage, { signal } = {}) {
 
   const reader = file.stream().getReader();
   const decoder = new TextDecoder("utf-8");
-  const csv = isCsv ? createCsvParser() : null;
-  let headerMap = null;
+  let csv = null;
+  let csvStream = null;
   let textTail = "";
   let sinceYield = 0;
 
   const handleRows = async (rows) => {
-    for (const row of rows) {
-      if (!headerMap) {
-        headerMap = csvHeaderMap(row);
-        if (headerMap.textIdx !== -1) continue; // header row consumed
-      }
-      const m = csvRowToMessage(row, headerMap);
-      if (m) {
-        await onMessage({ label: file.name, ...m });
-        count++;
-      }
+    for (const m of csvStream.feed(rows)) {
+      await onMessage({ label: file.name, ...m });
+      count++;
     }
   };
+
 
   for (;;) {
     if (signal?.aborted) break;
