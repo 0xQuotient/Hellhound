@@ -932,10 +932,9 @@ export default function HellhoundTerminal() {
   );
 
   const queueCampaignFiles = useCallback((id, fileList) => {
+    const added = Array.from(fileList);
     setSlots((prev) =>
-      prev.map((s) =>
-        s.id === id ? { ...s, error: null, files: [...s.files, ...Array.from(fileList)] } : s,
-      ),
+      prev.map((s) => (s.id === id ? { ...s, error: null, files: [...s.files, ...added] } : s)),
     );
   }, []);
 
