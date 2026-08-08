@@ -385,7 +385,6 @@ function BatchDropzone({ onFiles, hint, files = [], onRemoveFile }) {
   );
 }
 
-
 function ModeTab({ active, onClick, icon: Icon, children }) {
   return (
     <button
@@ -944,7 +943,6 @@ export default function HellhoundTerminal() {
     );
   }, []);
 
-
   const downloadCampaign = useCallback(
     (id) => {
       const campaign = slots.find((s) => s.id === id)?.campaign;
@@ -1353,7 +1351,9 @@ export default function HellhoundTerminal() {
                 </span>
                 <button
                   onClick={handleCorpusAnalyze}
-                  disabled={!!corpusBusy || (!splitBatchText(corpusText).length && !corpusFiles.length)}
+                  disabled={
+                    !!corpusBusy || (!splitBatchText(corpusText).length && !corpusFiles.length)
+                  }
                   className="px-6 py-2.5 bg-gradient-to-r from-rose-600 to-rose-500 hover:from-rose-500 hover:to-rose-400 disabled:opacity-40 text-white font-semibold text-xs rounded-xl transition-all shadow-lg shadow-rose-950/40"
                 >
                   Analyze

@@ -1034,7 +1034,11 @@ function parseCsv(content, delimiter) {
 }
 
 const TEXT_HEADERS = ["text", "body", "message", "content", "email", "email_body", "sample"];
-const norm = (h) => h.trim().toLowerCase().replace(/[\s-]+/g, "_");
+const norm = (h) =>
+  h
+    .trim()
+    .toLowerCase()
+    .replace(/[\s-]+/g, "_");
 
 function csvHeaderMap(headerRow) {
   const header = headerRow.map(norm);
@@ -1103,7 +1107,9 @@ function createCsvMessageStream() {
     // Treat row 0 as a header when it is short/label-like while later rows
     // carry long text in the same column.
     const firstLen = (rows[0][bestCol] || "").trim().length;
-    const restMax = rows.slice(1).reduce((m, r) => Math.max(m, (r[bestCol] || "").trim().length), 0);
+    const restMax = rows
+      .slice(1)
+      .reduce((m, r) => Math.max(m, (r[bestCol] || "").trim().length), 0);
     const headerish = rows.length > 1 && firstLen <= 40 && restMax > Math.max(60, firstLen * 2);
 
     map = headerish
@@ -1144,7 +1150,6 @@ function messagesFromCsv(content) {
   const s = createCsvMessageStream();
   return [...s.feed(rows), ...s.flush()];
 }
-
 
 function messagesFromJson(content) {
   const parsed = JSON.parse(content);
