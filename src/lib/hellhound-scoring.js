@@ -1217,12 +1217,22 @@ async function streamFileMessages(file, onMessage, { signal } = {}) {
     }
   };
 
+  let first = true;
 
   for (;;) {
     if (signal?.aborted) break;
     const { done, value } = await reader.read();
     if (done) break;
     const chunk = decoder.decode(value, { stream: true });
+    if (first) {
+      first = false;
+      // Sniff on real content: extensionless/mislabelled tabular files are common.
+      if (!isCsv && looksTabular(chunk)) isCsv = true;
+      if (isCsv) {
+        csv = createCsvParser(delimiter || sniffDelimiter(chunk.slice(0, 8192)));
+        csvStream = createCsvMessageStream();
+      }
+    }
     if (csv) await handleRows(csv.push(chunk));
     else {
       textTail += chunk;
@@ -1243,14 +1253,20 @@ async function streamFileMessages(file, onMessage, { signal } = {}) {
     }
   }
 
-  if (csv) await handleRows(csv.flush());
-  else {
+  if (csv) {
+    await handleRows(csv.flush());
+    for (const m of csvStream.flush()) {
+      await onMessage({ label: file.name, ...m });
+      count++;
+    }
+  } else {
     const t = textTail.trim();
     if (t) {
       await onMessage({ label: file.name, text: t });
       count++;
     }
   }
+
   return count;
 }
 
