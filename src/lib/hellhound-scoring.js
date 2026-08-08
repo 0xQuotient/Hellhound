@@ -1006,43 +1006,145 @@ function createCsvParser(delimiter = ",") {
   };
 }
 
-function parseCsv(content) {
-  const p = createCsvParser();
+/* Guesses the column separator from a sample of the file. Handles the
+   common exports: comma, semicolon (EU Excel), tab, pipe. */
+function sniffDelimiter(sample) {
+  const lines = sample.split("\n").slice(0, 20).join("\n");
+  const candidates = [",", ";", "\t", "|"];
+  let best = ",";
+  let bestCount = 0;
+  for (const d of candidates) {
+    let count = 0;
+    let inQuotes = false;
+    for (const ch of lines) {
+      if (ch === '"') inQuotes = !inQuotes;
+      else if (!inQuotes && ch === d) count++;
+    }
+    if (count > bestCount) {
+      bestCount = count;
+      best = d;
+    }
+  }
+  return bestCount > 0 ? best : ",";
+}
+
+function parseCsv(content, delimiter) {
+  const p = createCsvParser(delimiter || sniffDelimiter(content.slice(0, 8192)));
   return [...p.push(content), ...p.flush()];
 }
 
+const TEXT_HEADERS = ["text", "body", "message", "content", "email", "email_body", "sample"];
+const norm = (h) => h.trim().toLowerCase().replace(/[\s-]+/g, "_");
+
 function csvHeaderMap(headerRow) {
-  const header = headerRow.map((h) => h.trim().toLowerCase());
+  const header = headerRow.map(norm);
+  const looks = (h, words) => words.some((w) => h === w || h.includes(w));
   return {
-    textIdx: header.findIndex((h) => ["text", "body", "message", "content"].includes(h)),
-    channelIdx: header.indexOf("channel"),
-    outcomeIdx: header.indexOf("outcome"),
-    labelIdx: header.findIndex((h) => ["label", "id", "subject", "name"].includes(h)),
+    textIdx: (() => {
+      const exact = header.findIndex((h) => TEXT_HEADERS.includes(h));
+      if (exact !== -1) return exact;
+      return header.findIndex((h) => looks(h, ["body", "text", "message", "content"]));
+    })(),
+    channelIdx: header.findIndex((h) => looks(h, ["channel", "medium", "vector"])),
+    outcomeIdx: header.findIndex((h) => looks(h, ["outcome", "result", "disposition"])),
+    labelIdx: header.findIndex((h) => looks(h, ["label", "subject", "id", "name"])),
   };
 }
 
+function cell(row, idx) {
+  return idx > -1 ? (row[idx] || "").trim() : undefined;
+}
+
 function csvRowToMessage(row, map) {
-  if (map.textIdx === -1) {
-    const text = row.join(" ").trim();
-    return text ? { text } : null;
-  }
-  const text = (row[map.textIdx] || "").trim();
+  const idx = map.textIdx;
+  const text = idx > -1 ? (row[idx] || "").trim() : row.join(" ").trim();
   if (!text) return null;
   return {
     text,
-    channel: map.channelIdx > -1 ? (row[map.channelIdx] || "").trim() : undefined,
-    outcome: map.outcomeIdx > -1 ? (row[map.outcomeIdx] || "").trim() : undefined,
-    label: map.labelIdx > -1 ? (row[map.labelIdx] || "").trim() : undefined,
+    channel: cell(row, map.channelIdx),
+    outcome: cell(row, map.outcomeIdx),
+    label: cell(row, map.labelIdx),
+  };
+}
+
+/* A CSV row stream that figures out, from the first rows it sees, whether
+   there is a header and which column holds the message body. Without this
+   a file whose body column is named e.g. "email_body" collapsed into one
+   giant blob or one message per joined row. */
+const SNIFF_ROWS = 25;
+
+function createCsvMessageStream() {
+  let map = null;
+  let decided = false;
+  let buffer = [];
+
+  function decide() {
+    decided = true;
+    const rows = buffer;
+    if (!rows.length) return [];
+
+    const headerMap = csvHeaderMap(rows[0]);
+    if (headerMap.textIdx !== -1) {
+      map = headerMap;
+      return rows.slice(1);
+    }
+
+    // No recognizable header: pick the column that actually carries prose.
+    const width = rows.reduce((w, r) => Math.max(w, r.length), 0);
+    if (width <= 1) {
+      map = { textIdx: 0, channelIdx: -1, outcomeIdx: -1, labelIdx: -1 };
+      return rows;
+    }
+    const avg = new Array(width).fill(0);
+    for (const r of rows) for (let c = 0; c < width; c++) avg[c] += (r[c] || "").trim().length;
+    let bestCol = 0;
+    for (let c = 1; c < width; c++) if (avg[c] > avg[bestCol]) bestCol = c;
+
+    // Treat row 0 as a header when it is short/label-like while later rows
+    // carry long text in the same column.
+    const firstLen = (rows[0][bestCol] || "").trim().length;
+    const restMax = rows.slice(1).reduce((m, r) => Math.max(m, (r[bestCol] || "").trim().length), 0);
+    const headerish = rows.length > 1 && firstLen <= 40 && restMax > Math.max(60, firstLen * 2);
+
+    map = headerish
+      ? { ...headerMap, textIdx: bestCol }
+      : { textIdx: bestCol, channelIdx: -1, outcomeIdx: -1, labelIdx: -1 };
+    return headerish ? rows.slice(1) : rows;
+  }
+
+  function emit(rows) {
+    const out = [];
+    for (const r of rows) {
+      const m = csvRowToMessage(r, map);
+      if (m) out.push(m);
+    }
+    return out;
+  }
+
+  return {
+    feed(rows) {
+      if (decided) return emit(rows);
+      buffer = buffer.concat(rows);
+      if (buffer.length < SNIFF_ROWS) return [];
+      const usable = decide();
+      buffer = [];
+      return emit(usable);
+    },
+    flush() {
+      if (decided) return [];
+      const usable = decide();
+      buffer = [];
+      return emit(usable);
+    },
   };
 }
 
 function messagesFromCsv(content) {
   const rows = parseCsv(content);
-  if (!rows.length) return [];
-  const map = csvHeaderMap(rows[0]);
-  const body = map.textIdx === -1 ? rows : rows.slice(1);
-  return body.map((r) => csvRowToMessage(r, map)).filter(Boolean);
+  const s = createCsvMessageStream();
+  return [...s.feed(rows), ...s.flush()];
 }
+
 
 function messagesFromJson(content) {
   const parsed = JSON.parse(content);
