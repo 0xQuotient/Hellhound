@@ -941,7 +941,7 @@ export function splitBatchText(text) {
 /* ---- Streaming CSV ----------------------------------------------------
    A resumable, chunk-safe CSV parser. Feed it arbitrary slices of a file
    (quoted fields may span chunk boundaries) and it emits complete rows. */
-function createCsvParser() {
+function createCsvParser(delimiter = ",") {
   let field = "";
   let row = [];
   let inQuotes = false;
@@ -971,7 +971,7 @@ function createCsvParser() {
           }
         } else field += ch;
       } else if (ch === '"') inQuotes = true;
-      else if (ch === ",") {
+      else if (ch === delimiter) {
         row.push(field);
         field = "";
       } else if (ch === "\n") {
