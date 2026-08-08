@@ -1593,9 +1593,11 @@ export default function HellhoundTerminal() {
                     busy={s.busy}
                     canRemove={slots.length > 1}
                     onDraftChange={(draft) => patchSlot(s.id, { draft })}
-                    onFiles={(f) => loadCampaignFiles(s.id, f)}
+                    files={s.files}
+                    onFiles={(f) => queueCampaignFiles(s.id, f)}
+                    onRemoveFile={(i2) => removeCampaignFile(s.id, i2)}
                     onAnalyze={() => scoreCampaign(s.id)}
-                    onClear={() => patchSlot(s.id, { campaign: null })}
+                    onClear={() => patchSlot(s.id, { campaign: null, files: [] })}
                     onRemove={() => removeSlot(s.id)}
                     onDownload={() => downloadCampaign(s.id)}
                   />
