@@ -792,43 +792,59 @@ export default function HellhoundTerminal() {
 
   /* ---------- corpus ---------- */
 
-  const handleCorpusPaste = useCallback(async () => {
+  /* Nothing is parsed or scored on drop — everything happens here, when
+     the operator presses Analyze. */
+  const handleCorpusAnalyze = useCallback(async () => {
     const chunks = splitBatchText(corpusText);
-    if (!chunks.length) {
-      setCorpusError("Paste at least one message.");
+    if (!chunks.length && !corpusFiles.length) {
+      setCorpusError("Paste messages or queue files first.");
       return;
     }
-    setCorpusError(null);
-    setCorpusBusy("Scoring 0 messages…");
-    const scored = await analyzeCorpusAsync(
-      chunks.map((t, i) => ({ text: t, label: `pasted-${i + 1}` })),
-      { onProgress: ({ done }) => setCorpusBusy(`Scoring ${done.toLocaleString()} messages…`) },
-    );
-    setCorpusBusy(null);
-    if (!scored.length) setCorpusError("No readable messages found.");
-    else setCorpusEntries(scored);
-  }, [corpusText]);
-
-  const handleCorpusFiles = useCallback(async (fileList) => {
     const controller = new AbortController();
     corpusAbort.current = controller;
     setCorpusError(null);
-    setCorpusBusy("Reading files…");
+    setCorpusBusy("Analyzing…");
     try {
-      const { entries, failed } = await ingestFiles(fileList, {
-        signal: controller.signal,
-        onProgress: ({ done, file }) =>
-          setCorpusBusy(`Scored ${done.toLocaleString()} messages · ${file}`),
-      });
+      const collected = [];
+      if (chunks.length) {
+        const scored = await analyzeCorpusAsync(
+          chunks.map((t, i) => ({ text: t, label: `pasted-${i + 1}` })),
+          {
+            signal: controller.signal,
+            onProgress: ({ done }) => setCorpusBusy(`Analyzed ${done.toLocaleString()} messages…`),
+          },
+        );
+        collected.push(...scored);
+      }
+      let failed = [];
+      if (corpusFiles.length) {
+        const base = collected.length;
+        const res = await ingestFiles(corpusFiles, {
+          signal: controller.signal,
+          onProgress: ({ done, file }) =>
+            setCorpusBusy(`Analyzed ${(base + done).toLocaleString()} messages · ${file}`),
+        });
+        collected.push(...res.entries);
+        failed = res.failed;
+      }
       if (failed.length) setCorpusError(`Could not read: ${failed.join(", ")}`);
-      if (entries.length) setCorpusEntries(entries);
+      if (collected.length) setCorpusEntries(collected);
       else if (!failed.length) setCorpusError("No readable messages found.");
     } catch (err) {
-      setCorpusError(`Ingest failed: ${err?.message || "unknown error"}`);
+      setCorpusError(`Analysis failed: ${err?.message || "unknown error"}`);
     } finally {
       setCorpusBusy(null);
       corpusAbort.current = null;
     }
+  }, [corpusText, corpusFiles]);
+
+  const queueCorpusFiles = useCallback((fileList) => {
+    setCorpusError(null);
+    setCorpusFiles((prev) => [...prev, ...Array.from(fileList)]);
+  }, []);
+
+  const removeCorpusFile = useCallback((i) => {
+    setCorpusFiles((prev) => prev.filter((_, idx) => idx !== i));
   }, []);
 
   const cancelCorpus = useCallback(() => corpusAbort.current?.abort(), []);
