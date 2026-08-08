@@ -838,8 +838,10 @@ export default function HellhoundTerminal() {
   }, [corpusText, corpusFiles]);
 
   const queueCorpusFiles = useCallback((fileList) => {
+    // Snapshot the FileList now: the input is reset before the state updater runs.
+    const added = Array.from(fileList);
     setCorpusError(null);
-    setCorpusFiles((prev) => [...prev, ...Array.from(fileList)]);
+    setCorpusFiles((prev) => [...prev, ...added]);
   }, []);
 
   const removeCorpusFile = useCallback((i) => {
