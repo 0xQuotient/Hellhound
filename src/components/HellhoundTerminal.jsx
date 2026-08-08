@@ -617,8 +617,10 @@ function CampaignPanel({
   index,
   campaign,
   draft,
+  files = [],
   onDraftChange,
   onFiles,
+  onRemoveFile,
   onAnalyze,
   onRemove,
   onClear,
@@ -629,6 +631,7 @@ function CampaignPanel({
   canRemove,
 }) {
   const count = campaign?.entries.length ?? 0;
+  const pending = splitBatchText(draft.text).length + files.length;
   return (
     <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-4">
       <div className="flex items-center justify-between mb-3">
@@ -679,7 +682,12 @@ function CampaignPanel({
         className="w-full bg-black/30 border border-white/10 focus:border-rose-500/50 focus:outline-none rounded-xl p-3 text-xs leading-relaxed text-zinc-200 placeholder-zinc-600 resize-y font-mono transition-colors"
       />
       <div className="mt-2">
-        <BatchDropzone onFiles={onFiles} hint="Drop campaign files (.txt / .csv / .json / .eml)" />
+        <BatchDropzone
+          onFiles={onFiles}
+          files={files}
+          onRemoveFile={onRemoveFile}
+          hint="Queue campaign files (.txt / .csv / .tsv / .json / .eml)"
+        />
       </div>
       {error && <p className="text-xs text-red-400 mt-2">{error}</p>}
       {busy && <ProgressBar label={busy} />}
@@ -688,15 +696,18 @@ function CampaignPanel({
         <span className="text-xs text-zinc-600">
           {count > 0
             ? `${count.toLocaleString()} messages · ${campaign.summary.channelMix.map((m) => `${m.count} ${m.key.toLowerCase()}`).join(" + ")}`
-            : "No messages loaded"}
+            : "No messages analyzed"}
         </span>
         <button
           onClick={onAnalyze}
-          className="px-4 py-1.5 rounded-xl text-xs font-semibold bg-white/5 hover:bg-white/10 text-zinc-200 transition-colors"
+          disabled={!!busy || pending === 0}
+          className="px-4 py-1.5 rounded-xl text-xs font-semibold bg-white/5 hover:bg-white/10 disabled:opacity-30 text-zinc-200 transition-colors"
         >
-          Score campaign
+          Analyze
         </button>
       </div>
+    </div>
+
     </div>
   );
 }
