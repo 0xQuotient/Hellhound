@@ -888,43 +888,62 @@ export default function HellhoundTerminal() {
       const slot = slots.find((s) => s.id === id);
       if (!slot) return;
       const chunks = splitBatchText(slot.draft.text);
-      if (!chunks.length) {
-        patchSlot(id, { error: "Paste messages or drop files first." });
+      const files = slot.files || [];
+      if (!chunks.length && !files.length) {
+        patchSlot(id, { error: "Paste messages or queue files first." });
         return;
       }
-      patchSlot(id, { error: null, busy: "Scoring…" });
-      const entries = await analyzeCorpusAsync(
-        chunks.map((t, i) => ({ text: t, label: `${slot.draft.name}-${i + 1}` })),
-        {
-          onProgress: ({ done }) =>
-            patchSlot(id, { busy: `Scored ${done.toLocaleString()} messages…` }),
-        },
-      );
-      patchSlot(id, { busy: null, campaign: buildCampaign(slot.draft.name, entries) });
+      patchSlot(id, { error: null, busy: "Analyzing…" });
+      try {
+        const entries = [];
+        if (chunks.length) {
+          const scored = await analyzeCorpusAsync(
+            chunks.map((t, i) => ({ text: t, label: `${slot.draft.name}-${i + 1}` })),
+            {
+              onProgress: ({ done }) =>
+                patchSlot(id, { busy: `Analyzed ${done.toLocaleString()} messages…` }),
+            },
+          );
+          entries.push(...scored);
+        }
+        let failed = [];
+        if (files.length) {
+          const base = entries.length;
+          const res = await ingestFiles(files, {
+            onProgress: ({ done, file }) =>
+              patchSlot(id, {
+                busy: `Analyzed ${(base + done).toLocaleString()} messages · ${file}`,
+              }),
+          });
+          entries.push(...res.entries);
+          failed = res.failed;
+        }
+        patchSlot(id, {
+          busy: null,
+          error: failed.length ? `Could not read: ${failed.join(", ")}` : null,
+          campaign: entries.length ? buildCampaign(slot.draft.name, entries) : slot.campaign,
+        });
+      } catch (err) {
+        patchSlot(id, { busy: null, error: `Analysis failed: ${err?.message || "unknown error"}` });
+      }
     },
     [slots, patchSlot],
   );
 
-  const loadCampaignFiles = useCallback(
-    async (id, fileList) => {
-      const slot = slots.find((s) => s.id === id);
-      if (!slot) return;
-      patchSlot(id, { error: null, busy: "Reading files…" });
-      try {
-        const { entries, failed } = await ingestFiles(fileList, {
-          onProgress: ({ done, file }) =>
-            patchSlot(id, { busy: `Scored ${done.toLocaleString()} messages · ${file}` }),
-        });
-        if (failed.length) patchSlot(id, { error: `Could not read: ${failed.join(", ")}` });
-        if (entries.length)
-          patchSlot(id, { campaign: buildCampaign(slot.draft.name, entries), busy: null });
-        else patchSlot(id, { busy: null });
-      } catch (err) {
-        patchSlot(id, { busy: null, error: `Ingest failed: ${err?.message || "unknown error"}` });
-      }
-    },
-    [slots, patchSlot],
-  );
+  const queueCampaignFiles = useCallback((id, fileList) => {
+    setSlots((prev) =>
+      prev.map((s) =>
+        s.id === id ? { ...s, error: null, files: [...s.files, ...Array.from(fileList)] } : s,
+      ),
+    );
+  }, []);
+
+  const removeCampaignFile = useCallback((id, i) => {
+    setSlots((prev) =>
+      prev.map((s) => (s.id === id ? { ...s, files: s.files.filter((_, idx) => idx !== i) } : s)),
+    );
+  }, []);
+
 
   const downloadCampaign = useCallback(
     (id) => {
