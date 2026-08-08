@@ -316,46 +316,75 @@ const inputCls =
    MAIN COMPONENT
    ============================================================ */
 
-function BatchDropzone({ onFiles, hint }) {
+function BatchDropzone({ onFiles, hint, files = [], onRemoveFile }) {
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef(null);
 
   return (
-    <div
-      onDragOver={(e) => {
-        e.preventDefault();
-        setIsDragging(true);
-      }}
-      onDragLeave={() => setIsDragging(false)}
-      onDrop={(e) => {
-        e.preventDefault();
-        setIsDragging(false);
-        if (e.dataTransfer.files?.length) onFiles(e.dataTransfer.files);
-      }}
-      onClick={() => fileInputRef.current?.click()}
-      className={`border border-dashed rounded-2xl px-4 py-5 text-center cursor-pointer transition-colors ${isDragging ? "border-rose-500/50 bg-rose-500/5" : "border-white/10 hover:border-white/20"}`}
-    >
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept=".txt,.csv,.json,.eml,.md,text/plain,text/csv,application/json"
-        multiple
-        className="hidden"
-        onChange={(e) => {
-          if (e.target.files?.length) onFiles(e.target.files);
-          e.target.value = "";
+    <div>
+      <div
+        onDragOver={(e) => {
+          e.preventDefault();
+          setIsDragging(true);
         }}
-      />
-      <Upload className="w-4 h-4 text-zinc-600 mx-auto mb-1.5" />
-      <p className="text-xs text-zinc-500">
-        {hint || "Drop .txt / .csv / .json message files here, or click to browse"}
-      </p>
-      <p className="text-xs text-zinc-600 mt-0.5">
-        Read in memory only — nothing is uploaded, nothing is stored
-      </p>
+        onDragLeave={() => setIsDragging(false)}
+        onDrop={(e) => {
+          e.preventDefault();
+          setIsDragging(false);
+          if (e.dataTransfer.files?.length) onFiles(e.dataTransfer.files);
+        }}
+        onClick={() => fileInputRef.current?.click()}
+        className={`border border-dashed rounded-2xl px-4 py-5 text-center cursor-pointer transition-colors ${isDragging ? "border-rose-500/50 bg-rose-500/5" : "border-white/10 hover:border-white/20"}`}
+      >
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".txt,.csv,.tsv,.json,.eml,.md,text/plain,text/csv,application/json"
+          multiple
+          className="hidden"
+          onChange={(e) => {
+            if (e.target.files?.length) onFiles(e.target.files);
+            e.target.value = "";
+          }}
+        />
+        <Upload className="w-4 h-4 text-zinc-600 mx-auto mb-1.5" />
+        <p className="text-xs text-zinc-500">
+          {hint || "Drop .txt / .csv / .json message files here, or click to browse"}
+        </p>
+        <p className="text-xs text-zinc-600 mt-0.5">
+          Queued only — nothing is parsed until you press Analyze, nothing is uploaded or stored
+        </p>
+      </div>
+      {files.length > 0 && (
+        <ul className="mt-2 space-y-1">
+          {files.map((f, i) => (
+            <li
+              key={`${f.name}-${i}`}
+              className="flex items-center justify-between gap-2 rounded-lg bg-white/[0.03] px-3 py-1.5"
+            >
+              <span className="text-xs text-zinc-300 truncate font-mono">{f.name}</span>
+              <span className="flex items-center gap-2 shrink-0">
+                <span className="text-xs text-zinc-600 font-mono tabular-nums">
+                  {(f.size / 1024).toFixed(0)} KB
+                </span>
+                {onRemoveFile && (
+                  <button
+                    onClick={() => onRemoveFile(i)}
+                    className="text-zinc-600 hover:text-red-400 transition-colors"
+                    title="Remove file"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }
+
 
 function ModeTab({ active, onClick, icon: Icon, children }) {
   return (
