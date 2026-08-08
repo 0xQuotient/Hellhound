@@ -707,8 +707,6 @@ function CampaignPanel({
         </button>
       </div>
     </div>
-
-    </div>
   );
 }
 
