@@ -1118,7 +1118,7 @@ export default function HellhoundTerminal() {
                   disabled={!inputText.trim()}
                   className="flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-rose-600 to-rose-500 hover:from-rose-500 hover:to-rose-400 disabled:from-white/5 disabled:to-white/5 disabled:text-zinc-600 text-white font-semibold text-xs rounded-xl transition-all shadow-lg shadow-rose-950/40"
                 >
-                  Run analysis
+                  Analyze
                 </button>
               </div>
             </Card>
