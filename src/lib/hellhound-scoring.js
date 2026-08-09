@@ -860,11 +860,35 @@ export function analyzeText(rawText, meta = {}) {
     analyst_summary: summary,
   };
 
+  /* Raw, pre-normalization counts. Exported alongside the scores so a
+     defender can re-derive the composite or build their own detections
+     on the underlying features. */
+  const features = {
+    rubricVersion: RUBRIC_VERSION,
+    wordCount: readability.wordCount,
+    sentenceCount: readability.sentenceCount,
+    avgWordsPerSentence: readability.avgWordsPerSentence,
+    fleschEase: readability.fleschEase,
+    fkGrade: readability.fkGrade,
+    passiveVoicePct: passive,
+    ctaSteps: linguistic.cta_steps,
+    lexicon: Object.fromEntries(
+      Object.entries(lexicon).map(([k, v]) => [
+        k,
+        { count: v.count, density: v.density, hits: v.hits },
+      ]),
+    ),
+    cialdiniScores: Object.fromEntries(Object.entries(cialdini).map(([k, v]) => [k, v.score])),
+    components,
+  };
+
   return {
     timestamp: new Date().toISOString(),
+    rubricVersion: RUBRIC_VERSION,
     readability,
     passive,
     lexicon,
+    features,
     semantic,
     meta: {
       label: meta.label || "",
@@ -875,6 +899,7 @@ export function analyzeText(rawText, meta = {}) {
     excerpt: text.slice(0, 120),
   };
 }
+
 
 /* Flatten a full analysis into a compact row used by tables and rollups.
    The full analysis object is intentionally NOT retained: on a 50k-message
