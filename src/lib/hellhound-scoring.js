@@ -937,7 +937,27 @@ export function toEntry(analysis, index = 0) {
     readingGrade: analysis.readability.fkGrade,
     wordCount: analysis.readability.wordCount,
     lexicon: Object.fromEntries(Object.entries(analysis.lexicon).map(([k, v]) => [k, v.hits])),
+    /* Numeric feature vector (no hit strings — those live in `lexicon` above)
+       so exports carry the raw counts behind every normalized score. */
+    features: {
+      wordCount: analysis.features.wordCount,
+      sentenceCount: analysis.features.sentenceCount,
+      avgWordsPerSentence: analysis.features.avgWordsPerSentence,
+      fleschEase: analysis.features.fleschEase,
+      fkGrade: analysis.features.fkGrade,
+      passiveVoicePct: analysis.features.passiveVoicePct,
+      ctaSteps: analysis.features.ctaSteps,
+      lexiconCounts: Object.fromEntries(
+        Object.entries(analysis.features.lexicon).map(([k, v]) => [k, v.count]),
+      ),
+      lexiconDensities: Object.fromEntries(
+        Object.entries(analysis.features.lexicon).map(([k, v]) => [k, v.density]),
+      ),
+      cialdiniScores: analysis.features.cialdiniScores,
+      components: analysis.features.components,
+    },
   };
+
 }
 
 /* Dimensions used for corpus aggregation and campaign comparison. */
