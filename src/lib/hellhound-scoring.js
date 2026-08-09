@@ -442,6 +442,10 @@ export const TLX_DIMS = [
 export const CHANNELS = ["Email", "SMS", "Voice", "Chat", "Other"];
 export const OUTCOMES = ["Unknown", "No Reaction", "Clicked", "Reported", "Credentials Entered"];
 
+/* Bump when any lexicon, weight or formula changes — scores are only
+   comparable within one rubric version. Stamped into every export. */
+export const RUBRIC_VERSION = "1.0.0";
+
 /* Composite index weights — published so the score is auditable. */
 export const COMPOSITE_WEIGHTS = [
   { key: "pressure", label: "Emotional pressure", weight: 0.26 },
@@ -450,6 +454,7 @@ export const COMPOSITE_WEIGHTS = [
   { key: "cta", label: "Action demand", weight: 0.16 },
   { key: "friction", label: "Verification friction", weight: 0.16 },
 ];
+
 
 /* ------------------------------------------------------------
    SMALL MATH / TEXT HELPERS
