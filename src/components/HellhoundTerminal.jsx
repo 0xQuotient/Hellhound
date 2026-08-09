@@ -19,6 +19,9 @@ import {
   Trash2,
 } from "lucide-react";
 import {
+  RUBRIC_VERSION,
+  LEXICON_LABELS,
+
   LEXICON_LABELS,
   CIALDINI_KEYS,
   CIALDINI_LABELS,
