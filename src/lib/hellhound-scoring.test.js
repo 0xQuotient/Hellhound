@@ -176,9 +176,12 @@ describe("CSV ingest", () => {
     if (header) lines.push(["subject", "email_body", "channel", "outcome"].join(delim));
     for (let i = 0; i < 5; i++) {
       lines.push(
-        [`Subject ${i}`, `Urgent action required now, message number ${i}`, "Email", "Clicked"].join(
-          delim,
-        ),
+        [
+          `"Subject ${i}"`,
+          `"Urgent action required now, message number ${i}"`,
+          "Email",
+          "Clicked",
+        ].join(delim),
       );
     }
     return lines.join("\n");
@@ -283,14 +286,14 @@ describe("corpus aggregation", () => {
   it("picks outliers from the scored set", () => {
     const agg = aggregateCorpus(corpus);
     const scores = corpus.map((e) => e.compositeIndex);
-    expect(agg.highest.compositeIndex).toBe(Math.max(...scores));
-    expect(agg.lowest.compositeIndex).toBe(Math.min(...scores));
+    expect(agg.outliers.highest.compositeIndex).toBe(Math.max(...scores));
+    expect(agg.outliers.lowest.compositeIndex).toBe(Math.min(...scores));
   });
 
   it("detects phrasing repeated across messages", () => {
     const agg = aggregateCorpus(corpus);
-    expect(agg.repeatedPhrases.length).toBeGreaterThan(0);
-    agg.repeatedPhrases.forEach((p) => expect(p.count).toBeGreaterThan(1));
+    expect(agg.phrases.length).toBeGreaterThan(0);
+    agg.phrases.forEach((p) => expect(p.count).toBeGreaterThan(1));
   });
 
   it("is deterministic across repeated runs", () => {
