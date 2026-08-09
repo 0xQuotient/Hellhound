@@ -1233,12 +1233,13 @@ function messagesFromJson(content) {
 /* True when a sample looks like delimited rows rather than prose: the
    first handful of lines all carry the same separator count. */
 function looksTabular(sample) {
-  const lines = sample.split("\n").slice(0, 6).filter(Boolean);
-  if (lines.length < 2) return false;
-  const d = sniffDelimiter(lines.join("\n"));
-  const counts = lines.map((l) => l.split(d).length);
+  // Quote-aware: a delimiter inside a quoted field must not inflate the count.
+  const rows = parseCsv(sample.split("\n").slice(0, 8).join("\n")).slice(0, 6);
+  if (rows.length < 2) return false;
+  const counts = rows.map((r) => r.length);
   return counts[0] > 1 && counts.every((c) => c === counts[0]);
 }
+
 
 const yieldToUi = () => new Promise((r) => setTimeout(r, 0));
 
