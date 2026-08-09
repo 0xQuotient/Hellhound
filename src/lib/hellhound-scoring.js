@@ -455,7 +455,6 @@ export const COMPOSITE_WEIGHTS = [
   { key: "friction", label: "Verification friction", weight: 0.16 },
 ];
 
-
 /* ------------------------------------------------------------
    SMALL MATH / TEXT HELPERS
    ------------------------------------------------------------ */
@@ -900,7 +899,6 @@ export function analyzeText(rawText, meta = {}) {
   };
 }
 
-
 /* Flatten a full analysis into a compact row used by tables and rollups.
    The full analysis object is intentionally NOT retained: on a 50k-message
    corpus that alone is hundreds of megabytes. Only the excerpt, a capped
@@ -957,7 +955,6 @@ export function toEntry(analysis, index = 0) {
       components: analysis.features.components,
     },
   };
-
 }
 
 /* Dimensions used for corpus aggregation and campaign comparison. */
@@ -1239,7 +1236,6 @@ function looksTabular(sample) {
   const counts = rows.map((r) => r.length);
   return counts[0] > 1 && counts.every((c) => c === counts[0]);
 }
-
 
 const yieldToUi = () => new Promise((r) => setTimeout(r, 0));
 

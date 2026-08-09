@@ -76,10 +76,7 @@ describe("lexicon scan", () => {
     const urgency = Object.values(lex).find((v) => v.hits.includes("immediately"));
     expect(urgency).toBeTruthy();
     expect(urgency.count).toBeGreaterThan(0);
-    expect(urgency.density).toBeCloseTo(
-      Math.round((urgency.count / words) * 1000 * 10) / 10,
-      5,
-    );
+    expect(urgency.density).toBeCloseTo(Math.round((urgency.count / words) * 1000 * 10) / 10, 5);
   });
 
   it("returns zero counts for empty text", () => {
@@ -310,10 +307,7 @@ describe("corpus aggregation", () => {
 
 describe("N-way campaign comparison", () => {
   const mk = (name, texts, channel) =>
-    buildCampaign(
-      name,
-      analyzeCorpus(texts.map((t) => ({ text: t, channel }))),
-    );
+    buildCampaign(name, analyzeCorpus(texts.map((t) => ({ text: t, channel }))));
 
   const a = mk("Alpha", [PHISH, `${PHISH} Wire the funds today.`], "Email");
   const b = mk("Bravo", [BENIGN, `${BENIGN} Thanks again.`], "Voice");
