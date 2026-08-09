@@ -19,7 +19,9 @@ import {
   Trash2,
 } from "lucide-react";
 import {
+  RUBRIC_VERSION,
   LEXICON_LABELS,
+
   CIALDINI_KEYS,
   CIALDINI_LABELS,
   ATTACK_STAGES,
@@ -784,7 +786,14 @@ export default function HellhoundTerminal() {
   const handleDownloadCurrent = useCallback(() => {
     if (!result) return;
     downloadJSON(
-      { kind: "hellhound-analysis", generatedAt: new Date().toISOString(), analysis: result },
+      {
+        kind: "hellhound-analysis",
+        rubricVersion: RUBRIC_VERSION,
+        compositeWeights: COMPOSITE_WEIGHTS,
+        generatedAt: new Date().toISOString(),
+        analysis: result,
+      },
+
       `hellhound-analysis-${Date.now()}.json`,
     );
   }, [result]);
@@ -857,6 +866,8 @@ export default function HellhoundTerminal() {
     downloadJSON(
       {
         kind: "hellhound-corpus",
+        rubricVersion: RUBRIC_VERSION,
+        compositeWeights: COMPOSITE_WEIGHTS,
         generatedAt: new Date().toISOString(),
         summary: corpusSummary,
         messages: corpusEntries.map((e) => ({
@@ -864,8 +875,17 @@ export default function HellhoundTerminal() {
           channel: e.channel,
           outcome: e.outcome,
           text: e.sourceText,
+          scores: {
+            compositeIndex: e.compositeIndex,
+            stage: e.stage,
+            pretextCategory: e.pretextCategory,
+            ...Object.fromEntries(DIMENSIONS.map((d) => [d.key, e[d.key]])),
+          },
+          features: e.features,
+          lexiconHits: e.lexicon,
         })),
       },
+
       `hellhound-corpus-${Date.now()}.json`,
     );
   }, [corpusEntries, corpusSummary]);
@@ -952,6 +972,8 @@ export default function HellhoundTerminal() {
         {
           kind: "hellhound-campaign",
           name: campaign.name,
+          rubricVersion: RUBRIC_VERSION,
+          compositeWeights: COMPOSITE_WEIGHTS,
           generatedAt: new Date().toISOString(),
           summary: campaign.summary,
           messages: campaign.entries.map((e) => ({
@@ -959,7 +981,16 @@ export default function HellhoundTerminal() {
             channel: e.channel,
             outcome: e.outcome,
             text: e.sourceText,
+            scores: {
+              compositeIndex: e.compositeIndex,
+              stage: e.stage,
+              pretextCategory: e.pretextCategory,
+              ...Object.fromEntries(DIMENSIONS.map((d) => [d.key, e[d.key]])),
+            },
+            features: e.features,
+            lexiconHits: e.lexicon,
           })),
+
         },
         `hellhound-campaign-${campaign.name.replace(/\s+/g, "-").toLowerCase()}.json`,
       );

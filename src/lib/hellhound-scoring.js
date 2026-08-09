@@ -442,6 +442,10 @@ export const TLX_DIMS = [
 export const CHANNELS = ["Email", "SMS", "Voice", "Chat", "Other"];
 export const OUTCOMES = ["Unknown", "No Reaction", "Clicked", "Reported", "Credentials Entered"];
 
+/* Bump when any lexicon, weight or formula changes — scores are only
+   comparable within one rubric version. Stamped into every export. */
+export const RUBRIC_VERSION = "1.0.0";
+
 /* Composite index weights — published so the score is auditable. */
 export const COMPOSITE_WEIGHTS = [
   { key: "pressure", label: "Emotional pressure", weight: 0.26 },
@@ -855,11 +859,35 @@ export function analyzeText(rawText, meta = {}) {
     analyst_summary: summary,
   };
 
+  /* Raw, pre-normalization counts. Exported alongside the scores so a
+     defender can re-derive the composite or build their own detections
+     on the underlying features. */
+  const features = {
+    rubricVersion: RUBRIC_VERSION,
+    wordCount: readability.wordCount,
+    sentenceCount: readability.sentenceCount,
+    avgWordsPerSentence: readability.avgWordsPerSentence,
+    fleschEase: readability.fleschEase,
+    fkGrade: readability.fkGrade,
+    passiveVoicePct: passive,
+    ctaSteps: linguistic.cta_steps,
+    lexicon: Object.fromEntries(
+      Object.entries(lexicon).map(([k, v]) => [
+        k,
+        { count: v.count, density: v.density, hits: v.hits },
+      ]),
+    ),
+    cialdiniScores: Object.fromEntries(Object.entries(cialdini).map(([k, v]) => [k, v.score])),
+    components,
+  };
+
   return {
     timestamp: new Date().toISOString(),
+    rubricVersion: RUBRIC_VERSION,
     readability,
     passive,
     lexicon,
+    features,
     semantic,
     meta: {
       label: meta.label || "",
@@ -907,6 +935,25 @@ export function toEntry(analysis, index = 0) {
     readingGrade: analysis.readability.fkGrade,
     wordCount: analysis.readability.wordCount,
     lexicon: Object.fromEntries(Object.entries(analysis.lexicon).map(([k, v]) => [k, v.hits])),
+    /* Numeric feature vector (no hit strings — those live in `lexicon` above)
+       so exports carry the raw counts behind every normalized score. */
+    features: {
+      wordCount: analysis.features.wordCount,
+      sentenceCount: analysis.features.sentenceCount,
+      avgWordsPerSentence: analysis.features.avgWordsPerSentence,
+      fleschEase: analysis.features.fleschEase,
+      fkGrade: analysis.features.fkGrade,
+      passiveVoicePct: analysis.features.passiveVoicePct,
+      ctaSteps: analysis.features.ctaSteps,
+      lexiconCounts: Object.fromEntries(
+        Object.entries(analysis.features.lexicon).map(([k, v]) => [k, v.count]),
+      ),
+      lexiconDensities: Object.fromEntries(
+        Object.entries(analysis.features.lexicon).map(([k, v]) => [k, v.density]),
+      ),
+      cialdiniScores: analysis.features.cialdiniScores,
+      components: analysis.features.components,
+    },
   };
 }
 
@@ -1183,10 +1230,10 @@ function messagesFromJson(content) {
 /* True when a sample looks like delimited rows rather than prose: the
    first handful of lines all carry the same separator count. */
 function looksTabular(sample) {
-  const lines = sample.split("\n").slice(0, 6).filter(Boolean);
-  if (lines.length < 2) return false;
-  const d = sniffDelimiter(lines.join("\n"));
-  const counts = lines.map((l) => l.split(d).length);
+  // Quote-aware: a delimiter inside a quoted field must not inflate the count.
+  const rows = parseCsv(sample.split("\n").slice(0, 8).join("\n")).slice(0, 6);
+  if (rows.length < 2) return false;
+  const counts = rows.map((r) => r.length);
   return counts[0] > 1 && counts.every((c) => c === counts[0]);
 }
 
