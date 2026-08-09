@@ -972,6 +972,8 @@ export default function HellhoundTerminal() {
         {
           kind: "hellhound-campaign",
           name: campaign.name,
+          rubricVersion: RUBRIC_VERSION,
+          compositeWeights: COMPOSITE_WEIGHTS,
           generatedAt: new Date().toISOString(),
           summary: campaign.summary,
           messages: campaign.entries.map((e) => ({
@@ -979,7 +981,16 @@ export default function HellhoundTerminal() {
             channel: e.channel,
             outcome: e.outcome,
             text: e.sourceText,
+            scores: {
+              compositeIndex: e.compositeIndex,
+              stage: e.stage,
+              pretextCategory: e.pretextCategory,
+              ...Object.fromEntries(DIMENSIONS.map((d) => [d.key, e[d.key]])),
+            },
+            features: e.features,
+            lexiconHits: e.lexicon,
           })),
+
         },
         `hellhound-campaign-${campaign.name.replace(/\s+/g, "-").toLowerCase()}.json`,
       );
