@@ -165,7 +165,62 @@ describe("batch text splitting", () => {
   it("returns a single chunk when there is no separator", () => {
     expect(splitBatchText("just one message")).toEqual(["just one message"]);
   });
+
+  it("splits on email header starts", () => {
+    const out = splitBatchText(
+      [
+        "Subject: Password expiry",
+        "Your password expires today, please reset it right away.",
+        "",
+        "Subject: Invoice overdue",
+        "The attached invoice is past due and must be paid immediately.",
+      ].join("\n"),
+    );
+    expect(out).toHaveLength(2);
+    expect(out[1]).toContain("Invoice overdue");
+  });
+
+  it("splits after sign-offs when several messages are pasted together", () => {
+    const out = splitBatchText(
+      [
+        "Please verify your account details before the deadline tomorrow morning or access will be suspended.",
+        "Thanks,",
+        "IT Support",
+        "",
+        "The finance team needs the attached invoice approved today so the vendor payment can be released.",
+        "Regards,",
+        "Accounts Payable",
+      ].join("\n"),
+    );
+    expect(out).toHaveLength(2);
+    expect(out[1]).toContain("finance team");
+  });
+
+  it("keeps one email with a single sign-off intact", () => {
+    const out = splitBatchText(
+      [
+        "Hi Dana,",
+        "Please review the quarterly figures and confirm the numbers look right to you.",
+        "Thanks,",
+        "Sam",
+      ].join("\n"),
+    );
+    expect(out).toHaveLength(1);
+  });
+
+  it("merges short fragments into the previous message", () => {
+    const out = splitBatchText(
+      [
+        "Subject: Access review",
+        "Your account requires immediate revalidation before the end of the business day.",
+        "",
+        "Subject: Hi",
+      ].join("\n"),
+    );
+    expect(out).toHaveLength(1);
+  });
 });
+
 
 describe("CSV ingest", () => {
   const rows = (delim, header = true) => {

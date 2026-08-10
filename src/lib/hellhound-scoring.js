@@ -976,14 +976,101 @@ export const DIMENSIONS = [
    BATCH INPUT PARSING
    ------------------------------------------------------------ */
 
-export const BATCH_DELIMITER = /^\s*---+\s*$/m;
+export const BATCH_DELIMITER = /^\s*(?:-{3,}|={3,}|\*{3,}|_{3,})\s*$/m;
+
+const EXPLICIT_SEPARATOR =
+  /^[ \t]*(?:-{3,}|={3,}|\*{3,}|_{3,}|(?:-{2,}|={2,}|\*{2,})[ \t]*(?:message|email|sample|msg|item|record)[ \t#]*\d*[ \t]*(?:-{2,}|={2,}|\*{2,}))[ \t]*$/i;
+
+const HEADER_START =
+  /^[ \t]*(?:from|to|cc|bcc|subject|date|sent|reply-to|return-path)[ \t]*:/i;
+
+const LABEL_START =
+  /^[ \t]*(?:\[?#?\s*\d{1,4}\s*[\].):-]|(?:message|email|msg|sample|call|voicemail|sms|text|transcript)[ \t#]*\d{1,4}\s*[:.)\-—]?)[ \t]*/i;
+
+const QUOTED_REPLY = /^[ \t]*On\s+.{5,80}\s+wrote:[ \t]*$/i;
+
+const SIGNOFF =
+  /^[ \t]*(?:thanks|thank you|thanks again|many thanks|regards|kind regards|best regards|best|sincerely|cheers|respectfully|warm regards|yours truly|talk soon|appreciate it)[ \t]*[,.!]?[ \t]*$/i;
+
+const wordCount = (s) => (s.trim().match(/\S+/g) || []).length;
+
+/* Splits pasted text into individual messages without the user marking
+   boundaries. Explicit separator lines win outright; otherwise we look for
+   the natural starts and ends of messages. */
+export function splitMessagesAuto(text) {
+  const raw = String(text || "");
+  if (!raw.trim()) return [];
+
+  const lines = raw.split(/\r\n|\r|\n/);
+
+  // 1. Explicit separators take precedence over every heuristic.
+  if (lines.some((l) => EXPLICIT_SEPARATOR.test(l))) {
+    const out = [];
+    let buf = [];
+    for (const line of lines) {
+      if (EXPLICIT_SEPARATOR.test(line)) {
+        out.push(buf.join("\n"));
+        buf = [];
+      } else buf.push(line);
+    }
+    out.push(buf.join("\n"));
+    return out.map((s) => s.trim()).filter(Boolean);
+  }
+
+  const signoffCount = lines.filter((l) => SIGNOFF.test(l)).length;
+
+  const chunks = [];
+  let buf = [];
+  let sawSignoff = false;
+
+  const flush = () => {
+    const t = buf.join("\n").trim();
+    if (t) chunks.push(t);
+    buf = [];
+    sawSignoff = false;
+  };
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const prevBlank = i === 0 || !lines[i - 1].trim();
+    const body = buf.join("\n").trim();
+    const hasBody = body.length > 0;
+
+    const isBoundaryStart =
+      hasBody &&
+      prevBlank &&
+      line.trim() &&
+      (HEADER_START.test(line) || LABEL_START.test(line) || QUOTED_REPLY.test(line));
+
+    // A sign-off ends a message: the next real prose after it starts a new one.
+    const afterSignoff =
+      hasBody &&
+      sawSignoff &&
+      prevBlank &&
+      line.trim() &&
+      signoffCount > 1 &&
+      wordCount(body) >= 15;
+
+    if (isBoundaryStart || afterSignoff) flush();
+
+    if (SIGNOFF.test(line)) sawSignoff = true;
+    buf.push(line);
+  }
+  flush();
+
+  // Merge stray fragments back into their predecessor.
+  const merged = [];
+  for (const c of chunks) {
+    if (merged.length && c.length < 40) merged[merged.length - 1] += "\n\n" + c;
+    else merged.push(c);
+  }
+  return merged;
+}
 
 export function splitBatchText(text) {
-  return String(text || "")
-    .split(/^\s*---+\s*$/m)
-    .map((s) => s.trim())
-    .filter((s) => s.length > 0);
+  return splitMessagesAuto(text);
 }
+
 
 /* ---- Streaming CSV ----------------------------------------------------
    A resumable, chunk-safe CSV parser. Feed it arbitrary slices of a file
@@ -1298,7 +1385,8 @@ async function streamFileMessages(file, onMessage, { signal } = {}) {
     if (csv) await handleRows(csv.push(chunk));
     else {
       textTail += chunk;
-      const parts = textTail.split(/^\s*---+\s*$/m);
+      // Hold back the last chunk: a boundary may span the chunk edge.
+      const parts = splitMessagesAuto(textTail);
       textTail = parts.pop() ?? "";
       for (const part of parts) {
         const t = part.trim();
@@ -1308,6 +1396,7 @@ async function streamFileMessages(file, onMessage, { signal } = {}) {
         }
       }
     }
+
     sinceYield += chunk.length;
     if (sinceYield > 1_000_000) {
       sinceYield = 0;

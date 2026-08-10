@@ -46,7 +46,9 @@ npx serve dist/client   # or: python3 -m http.server -d dist/client
 
 ## Input formats
 
-- **Paste**: multiple messages separated by a line containing `---`.
+- **Paste**: multiple messages are detected automatically (header lines, numbered
+  labels, sign-offs, or explicit `---` separator lines).
+
 - **Files**: `.txt`, `.csv`/`.tsv`, `.json`, `.eml`. Multiple files can be queued; they
   are only parsed when you press **Analyze**.
 - **CSV**: delimiter is sniffed (`,` `;` tab `|`). Headers are fuzzy-matched
