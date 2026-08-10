@@ -1385,7 +1385,8 @@ async function streamFileMessages(file, onMessage, { signal } = {}) {
     if (csv) await handleRows(csv.push(chunk));
     else {
       textTail += chunk;
-      const parts = textTail.split(/^\s*---+\s*$/m);
+      // Hold back the last chunk: a boundary may span the chunk edge.
+      const parts = splitMessagesAuto(textTail);
       textTail = parts.pop() ?? "";
       for (const part of parts) {
         const t = part.trim();
@@ -1395,6 +1396,7 @@ async function streamFileMessages(file, onMessage, { signal } = {}) {
         }
       }
     }
+
     sinceYield += chunk.length;
     if (sinceYield > 1_000_000) {
       sinceYield = 0;
