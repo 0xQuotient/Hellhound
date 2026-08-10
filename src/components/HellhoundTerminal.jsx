@@ -982,6 +982,41 @@ export default function HellhoundTerminal() {
     [slots],
   );
 
+  const downloadComparison = useCallback(() => {
+    if (!comparison) return;
+    downloadJSON(
+      {
+        kind: "hellhound-campaign-comparison",
+        rubricVersion: RUBRIC_VERSION,
+        compositeWeights: COMPOSITE_WEIGHTS,
+        generatedAt: new Date().toISOString(),
+        findings: comparison.findings,
+        matrix: comparison.rows,
+        campaigns: comparison.campaigns.map((c) => ({
+          name: c.name,
+          messageCount: c.entries.length,
+          summary: c.summary,
+          messages: c.entries.map((e) => ({
+            label: e.label,
+            channel: e.channel,
+            outcome: e.outcome,
+            text: e.sourceText,
+            scores: {
+              compositeIndex: e.compositeIndex,
+              stage: e.stage,
+              pretextCategory: e.pretextCategory,
+              ...Object.fromEntries(DIMENSIONS.map((d) => [d.key, e[d.key]])),
+            },
+            features: e.features,
+            lexiconHits: e.lexicon,
+          })),
+        })),
+      },
+      "hellhound-campaign-comparison.json",
+    );
+  }, [comparison]);
+
+
   /* ---------- derived (single) ---------- */
 
   const tier = result ? riskTier(result.semantic.composite_index) : null;
