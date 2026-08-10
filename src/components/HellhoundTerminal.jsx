@@ -890,26 +890,34 @@ export default function HellhoundTerminal() {
     setSlots((prev) => (prev.length <= 1 ? prev : prev.filter((s) => s.id !== id)));
   }, []);
 
-  const scoreCampaign = useCallback(
-    async (id) => {
-      const slot = slots.find((s) => s.id === id);
-      if (!slot) return;
-      const chunks = splitBatchText(slot.draft.text);
-      const files = slot.files || [];
-      if (!chunks.length && !files.length) {
-        patchSlot(id, { error: "Paste messages or queue files first." });
-        return;
-      }
-      patchSlot(id, { error: null, busy: "Analyzing…" });
-      try {
+  /* Campaigns are only ever scored as a set: one run, all slots, straight
+     into the cross-analysis. */
+  const analyzeCampaigns = useCallback(async () => {
+    const loaded = slots.filter(
+      (s) => splitBatchText(s.draft.text).length > 0 || (s.files || []).length > 0,
+    );
+    if (loaded.length < 2) {
+      setCompareError("Load at least two campaigns to analyze them against each other.");
+      return;
+    }
+    setCompareError(null);
+    setCompareBusy("Analyzing campaigns…");
+    setSlots((prev) => prev.map((s) => ({ ...s, error: null, campaign: null })));
+    try {
+      const results = [];
+      for (let n = 0; n < loaded.length; n++) {
+        const slot = loaded[n];
+        const chunks = splitBatchText(slot.draft.text);
+        const files = slot.files || [];
         const entries = [];
+        const progress = (done, extra = "") =>
+          setCompareBusy(
+            `${slot.draft.name} (${n + 1}/${loaded.length}) · ${done.toLocaleString()} messages${extra}`,
+          );
         if (chunks.length) {
           const scored = await analyzeCorpusAsync(
             chunks.map((t, i) => ({ text: t, label: `${slot.draft.name}-${i + 1}` })),
-            {
-              onProgress: ({ done }) =>
-                patchSlot(id, { busy: `Analyzed ${done.toLocaleString()} messages…` }),
-            },
+            { onProgress: ({ done }) => progress(done) },
           );
           entries.push(...scored);
         }
@@ -917,25 +925,31 @@ export default function HellhoundTerminal() {
         if (files.length) {
           const base = entries.length;
           const res = await ingestFiles(files, {
-            onProgress: ({ done, file }) =>
-              patchSlot(id, {
-                busy: `Analyzed ${(base + done).toLocaleString()} messages · ${file}`,
-              }),
+            onProgress: ({ done, file }) => progress(base + done, ` · ${file}`),
           });
           entries.push(...res.entries);
           failed = res.failed;
         }
-        patchSlot(id, {
-          busy: null,
+        results.push({
+          id: slot.id,
+          campaign: entries.length ? buildCampaign(slot.draft.name, entries) : null,
           error: failed.length ? `Could not read: ${failed.join(", ")}` : null,
-          campaign: entries.length ? buildCampaign(slot.draft.name, entries) : slot.campaign,
         });
-      } catch (err) {
-        patchSlot(id, { busy: null, error: `Analysis failed: ${err?.message || "unknown error"}` });
       }
-    },
-    [slots, patchSlot],
-  );
+      setSlots((prev) =>
+        prev.map((s) => {
+          const r = results.find((x) => x.id === s.id);
+          return r ? { ...s, campaign: r.campaign, error: r.error } : s;
+        }),
+      );
+      setCompareBusy(null);
+      if (results.filter((r) => r.campaign).length < 2)
+        setCompareError("Fewer than two campaigns produced messages — check the inputs.");
+    } catch (err) {
+      setCompareBusy(null);
+      setCompareError(`Analysis failed: ${err?.message || "unknown error"}`);
+    }
+  }, [slots]);
 
   const queueCampaignFiles = useCallback((id, fileList) => {
     const added = Array.from(fileList);
@@ -950,39 +964,6 @@ export default function HellhoundTerminal() {
     );
   }, []);
 
-  const downloadCampaign = useCallback(
-    (id) => {
-      const campaign = slots.find((s) => s.id === id)?.campaign;
-      if (!campaign) return;
-      downloadJSON(
-        {
-          kind: "hellhound-campaign",
-          name: campaign.name,
-          rubricVersion: RUBRIC_VERSION,
-          compositeWeights: COMPOSITE_WEIGHTS,
-          generatedAt: new Date().toISOString(),
-          summary: campaign.summary,
-          messages: campaign.entries.map((e) => ({
-            label: e.label,
-            channel: e.channel,
-            outcome: e.outcome,
-            text: e.sourceText,
-            scores: {
-              compositeIndex: e.compositeIndex,
-              stage: e.stage,
-              pretextCategory: e.pretextCategory,
-              ...Object.fromEntries(DIMENSIONS.map((d) => [d.key, e[d.key]])),
-            },
-            features: e.features,
-            lexiconHits: e.lexicon,
-          })),
-
-        },
-        `hellhound-campaign-${campaign.name.replace(/\s+/g, "-").toLowerCase()}.json`,
-      );
-    },
-    [slots],
-  );
 
   const handleSendCorpusTo = useCallback(() => {
     if (!corpusEntries.length) return;
