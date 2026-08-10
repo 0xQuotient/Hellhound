@@ -1615,7 +1615,7 @@ export default function HellhoundTerminal() {
         {mode === "compare" && (
           <div className="space-y-4">
             <Card>
-              <SectionLabel sub="Load as many campaigns as you like — any mix of channels and volumes — and cross-analyse their construction against each other.">
+              <SectionLabel sub="Load two or more campaigns — any mix of channels and volumes — then press Analyze to cross-analyze them against each other.">
                 Campaign comparison
               </SectionLabel>
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
