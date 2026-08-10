@@ -1633,28 +1633,46 @@ export default function HellhoundTerminal() {
                     files={s.files}
                     onFiles={(f) => queueCampaignFiles(s.id, f)}
                     onRemoveFile={(i2) => removeCampaignFile(s.id, i2)}
-                    onAnalyze={() => scoreCampaign(s.id)}
                     onClear={() => patchSlot(s.id, { campaign: null, files: [] })}
                     onRemove={() => removeSlot(s.id)}
-                    onDownload={() => downloadCampaign(s.id)}
                   />
                 ))}
               </div>
-              <button
-                onClick={addSlot}
-                className="mt-4 flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold bg-white/5 hover:bg-white/10 text-zinc-200 transition-colors"
-              >
-                <Plus className="w-3.5 h-3.5" /> Add campaign
-              </button>
+              <div className="mt-4 flex flex-wrap items-center gap-2">
+                <button
+                  onClick={addSlot}
+                  className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold bg-white/5 hover:bg-white/10 text-zinc-200 transition-colors"
+                >
+                  <Plus className="w-3.5 h-3.5" /> Add campaign
+                </button>
+                <button
+                  onClick={analyzeCampaigns}
+                  disabled={!!compareBusy}
+                  className="px-5 py-2 rounded-xl text-xs font-bold bg-rose-600 hover:bg-rose-500 disabled:opacity-30 text-white transition-colors"
+                >
+                  Analyze
+                </button>
+                {comparison && (
+                  <button
+                    onClick={downloadComparison}
+                    className="flex items-center gap-1 px-4 py-2 rounded-xl text-xs font-semibold bg-white/5 hover:bg-white/10 text-zinc-200 transition-colors"
+                  >
+                    <Download className="w-3.5 h-3.5" /> Save comparison
+                  </button>
+                )}
+              </div>
+              {compareError && <p className="text-xs text-red-400 mt-2">{compareError}</p>}
+              {compareBusy && <ProgressBar label={compareBusy} />}
             </Card>
 
             {!comparison ? (
               <div className="border border-dashed border-white/10 rounded-3xl p-8 text-center">
                 <p className="text-xs text-zinc-500">
-                  Score at least two campaigns to see the cross-analysis.
+                  Load at least two campaigns and press Analyze to cross-analyze them.
                 </p>
               </div>
             ) : (
+
               <>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                   {comparison.campaigns.map((c, i) => (
