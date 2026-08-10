@@ -15,7 +15,7 @@ published rubric that you can read in `src/lib/hellhound-scoring.js` and re-impl
 - Zero telemetry: no analytics, no error reporting, no third-party scripts.
 - Files are read with the browser `File`/stream APIs and never leave the tab.
 
-Verify it yourself: build, serve the static output, open DevTools → Network, and analyze
+Verify it yourself: build, serve the output, open DevTools → Network, and analyze
 a corpus. The request list stays empty after the initial asset load.
 
 ## Running it
@@ -23,15 +23,17 @@ a corpus. The request list stays empty after the initial asset load.
 ```sh
 npm install
 npm run dev      # http://localhost:8080
-npm run build    # static output
+npm run build    # client bundle in dist/client, server shell in dist/server
 npm test         # unit tests for the scoring math
 ```
 
-The build prerenders `/` to static HTML, so the output can be served from any plain
-HTTP server in an air-gapped lab:
+All analysis code ships in the client bundle, so the contents of `dist/client` can be
+served from any plain HTTP server in an air-gapped lab (point its 404/fallback at
+`index.html`):
 
 ```sh
 npx serve dist/client   # or: python3 -m http.server -d dist/client
+
 ```
 
 ## Modes
