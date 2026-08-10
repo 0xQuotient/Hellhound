@@ -622,10 +622,8 @@ function CampaignPanel({
   onDraftChange,
   onFiles,
   onRemoveFile,
-  onAnalyze,
   onRemove,
   onClear,
-  onDownload,
   error,
   busy,
   color,
@@ -648,20 +646,12 @@ function CampaignPanel({
         </div>
         <div className="flex items-center gap-3">
           {count > 0 && (
-            <>
-              <button
-                onClick={onDownload}
-                className="flex items-center gap-1 text-xs text-zinc-400 hover:text-rose-300 transition-colors"
-              >
-                <Download className="w-3.5 h-3.5" /> Save
-              </button>
-              <button
-                onClick={onClear}
-                className="flex items-center gap-1 text-xs text-zinc-500 hover:text-red-400 transition-colors"
-              >
-                <X className="w-3.5 h-3.5" /> Clear
-              </button>
-            </>
+            <button
+              onClick={onClear}
+              className="flex items-center gap-1 text-xs text-zinc-500 hover:text-red-400 transition-colors"
+            >
+              <X className="w-3.5 h-3.5" /> Clear
+            </button>
           )}
           {canRemove && (
             <button
@@ -693,23 +683,19 @@ function CampaignPanel({
       {error && <p className="text-xs text-red-400 mt-2">{error}</p>}
       {busy && <ProgressBar label={busy} />}
 
-      <div className="flex items-center justify-between mt-3">
+      <div className="mt-3">
         <span className="text-xs text-zinc-600">
           {count > 0
             ? `${count.toLocaleString()} messages · ${campaign.summary.channelMix.map((m) => `${m.count} ${m.key.toLowerCase()}`).join(" + ")}`
-            : "No messages analyzed"}
+            : pending > 0
+              ? `${pending.toLocaleString()} queued · not analyzed yet`
+              : "Nothing queued"}
         </span>
-        <button
-          onClick={onAnalyze}
-          disabled={!!busy || pending === 0}
-          className="px-4 py-1.5 rounded-xl text-xs font-semibold bg-white/5 hover:bg-white/10 disabled:opacity-30 text-zinc-200 transition-colors"
-        >
-          Analyze
-        </button>
       </div>
     </div>
   );
 }
+
 
 /* ============================================================
    MAIN COMPONENT
@@ -746,6 +732,9 @@ export default function HellhoundTerminal() {
 
   // Campaigns — an unbounded list of slots, compared all at once.
   const [slots, setSlots] = useState(() => [newSlot("Campaign 1"), newSlot("Campaign 2")]);
+  const [compareBusy, setCompareBusy] = useState(null);
+  const [compareError, setCompareError] = useState(null);
+
 
   /* Everything above lives in React memory only. No localStorage, no
      sessionStorage, no cookies, no server, no database. Reloading the tab
@@ -904,26 +893,34 @@ export default function HellhoundTerminal() {
     setSlots((prev) => (prev.length <= 1 ? prev : prev.filter((s) => s.id !== id)));
   }, []);
 
-  const scoreCampaign = useCallback(
-    async (id) => {
-      const slot = slots.find((s) => s.id === id);
-      if (!slot) return;
-      const chunks = splitBatchText(slot.draft.text);
-      const files = slot.files || [];
-      if (!chunks.length && !files.length) {
-        patchSlot(id, { error: "Paste messages or queue files first." });
-        return;
-      }
-      patchSlot(id, { error: null, busy: "Analyzing…" });
-      try {
+  /* Campaigns are only ever scored as a set: one run, all slots, straight
+     into the cross-analysis. */
+  const analyzeCampaigns = useCallback(async () => {
+    const loaded = slots.filter(
+      (s) => splitBatchText(s.draft.text).length > 0 || (s.files || []).length > 0,
+    );
+    if (loaded.length < 2) {
+      setCompareError("Load at least two campaigns to analyze them against each other.");
+      return;
+    }
+    setCompareError(null);
+    setCompareBusy("Analyzing campaigns…");
+    setSlots((prev) => prev.map((s) => ({ ...s, error: null, campaign: null })));
+    try {
+      const results = [];
+      for (let n = 0; n < loaded.length; n++) {
+        const slot = loaded[n];
+        const chunks = splitBatchText(slot.draft.text);
+        const files = slot.files || [];
         const entries = [];
+        const progress = (done, extra = "") =>
+          setCompareBusy(
+            `${slot.draft.name} (${n + 1}/${loaded.length}) · ${done.toLocaleString()} messages${extra}`,
+          );
         if (chunks.length) {
           const scored = await analyzeCorpusAsync(
             chunks.map((t, i) => ({ text: t, label: `${slot.draft.name}-${i + 1}` })),
-            {
-              onProgress: ({ done }) =>
-                patchSlot(id, { busy: `Analyzed ${done.toLocaleString()} messages…` }),
-            },
+            { onProgress: ({ done }) => progress(done) },
           );
           entries.push(...scored);
         }
@@ -931,25 +928,31 @@ export default function HellhoundTerminal() {
         if (files.length) {
           const base = entries.length;
           const res = await ingestFiles(files, {
-            onProgress: ({ done, file }) =>
-              patchSlot(id, {
-                busy: `Analyzed ${(base + done).toLocaleString()} messages · ${file}`,
-              }),
+            onProgress: ({ done, file }) => progress(base + done, ` · ${file}`),
           });
           entries.push(...res.entries);
           failed = res.failed;
         }
-        patchSlot(id, {
-          busy: null,
+        results.push({
+          id: slot.id,
+          campaign: entries.length ? buildCampaign(slot.draft.name, entries) : null,
           error: failed.length ? `Could not read: ${failed.join(", ")}` : null,
-          campaign: entries.length ? buildCampaign(slot.draft.name, entries) : slot.campaign,
         });
-      } catch (err) {
-        patchSlot(id, { busy: null, error: `Analysis failed: ${err?.message || "unknown error"}` });
       }
-    },
-    [slots, patchSlot],
-  );
+      setSlots((prev) =>
+        prev.map((s) => {
+          const r = results.find((x) => x.id === s.id);
+          return r ? { ...s, campaign: r.campaign, error: r.error } : s;
+        }),
+      );
+      setCompareBusy(null);
+      if (results.filter((r) => r.campaign).length < 2)
+        setCompareError("Fewer than two campaigns produced messages — check the inputs.");
+    } catch (err) {
+      setCompareBusy(null);
+      setCompareError(`Analysis failed: ${err?.message || "unknown error"}`);
+    }
+  }, [slots]);
 
   const queueCampaignFiles = useCallback((id, fileList) => {
     const added = Array.from(fileList);
@@ -964,39 +967,6 @@ export default function HellhoundTerminal() {
     );
   }, []);
 
-  const downloadCampaign = useCallback(
-    (id) => {
-      const campaign = slots.find((s) => s.id === id)?.campaign;
-      if (!campaign) return;
-      downloadJSON(
-        {
-          kind: "hellhound-campaign",
-          name: campaign.name,
-          rubricVersion: RUBRIC_VERSION,
-          compositeWeights: COMPOSITE_WEIGHTS,
-          generatedAt: new Date().toISOString(),
-          summary: campaign.summary,
-          messages: campaign.entries.map((e) => ({
-            label: e.label,
-            channel: e.channel,
-            outcome: e.outcome,
-            text: e.sourceText,
-            scores: {
-              compositeIndex: e.compositeIndex,
-              stage: e.stage,
-              pretextCategory: e.pretextCategory,
-              ...Object.fromEntries(DIMENSIONS.map((d) => [d.key, e[d.key]])),
-            },
-            features: e.features,
-            lexiconHits: e.lexicon,
-          })),
-
-        },
-        `hellhound-campaign-${campaign.name.replace(/\s+/g, "-").toLowerCase()}.json`,
-      );
-    },
-    [slots],
-  );
 
   const handleSendCorpusTo = useCallback(() => {
     if (!corpusEntries.length) return;
@@ -1014,6 +984,41 @@ export default function HellhoundTerminal() {
     () => compareCampaigns(slots.map((s) => s.campaign).filter(Boolean)),
     [slots],
   );
+
+  const downloadComparison = useCallback(() => {
+    if (!comparison) return;
+    downloadJSON(
+      {
+        kind: "hellhound-campaign-comparison",
+        rubricVersion: RUBRIC_VERSION,
+        compositeWeights: COMPOSITE_WEIGHTS,
+        generatedAt: new Date().toISOString(),
+        findings: comparison.findings,
+        matrix: comparison.rows,
+        campaigns: comparison.campaigns.map((c) => ({
+          name: c.name,
+          messageCount: c.entries.length,
+          summary: c.summary,
+          messages: c.entries.map((e) => ({
+            label: e.label,
+            channel: e.channel,
+            outcome: e.outcome,
+            text: e.sourceText,
+            scores: {
+              compositeIndex: e.compositeIndex,
+              stage: e.stage,
+              pretextCategory: e.pretextCategory,
+              ...Object.fromEntries(DIMENSIONS.map((d) => [d.key, e[d.key]])),
+            },
+            features: e.features,
+            lexiconHits: e.lexicon,
+          })),
+        })),
+      },
+      "hellhound-campaign-comparison.json",
+    );
+  }, [comparison]);
+
 
   /* ---------- derived (single) ---------- */
 
@@ -1610,7 +1615,7 @@ export default function HellhoundTerminal() {
         {mode === "compare" && (
           <div className="space-y-4">
             <Card>
-              <SectionLabel sub="Load as many campaigns as you like — any mix of channels and volumes — and cross-analyse their construction against each other.">
+              <SectionLabel sub="Load two or more campaigns — any mix of channels and volumes — then press Analyze to cross-analyze them against each other.">
                 Campaign comparison
               </SectionLabel>
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -1628,28 +1633,46 @@ export default function HellhoundTerminal() {
                     files={s.files}
                     onFiles={(f) => queueCampaignFiles(s.id, f)}
                     onRemoveFile={(i2) => removeCampaignFile(s.id, i2)}
-                    onAnalyze={() => scoreCampaign(s.id)}
                     onClear={() => patchSlot(s.id, { campaign: null, files: [] })}
                     onRemove={() => removeSlot(s.id)}
-                    onDownload={() => downloadCampaign(s.id)}
                   />
                 ))}
               </div>
-              <button
-                onClick={addSlot}
-                className="mt-4 flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold bg-white/5 hover:bg-white/10 text-zinc-200 transition-colors"
-              >
-                <Plus className="w-3.5 h-3.5" /> Add campaign
-              </button>
+              <div className="mt-4 flex flex-wrap items-center gap-2">
+                <button
+                  onClick={addSlot}
+                  className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold bg-white/5 hover:bg-white/10 text-zinc-200 transition-colors"
+                >
+                  <Plus className="w-3.5 h-3.5" /> Add campaign
+                </button>
+                <button
+                  onClick={analyzeCampaigns}
+                  disabled={!!compareBusy}
+                  className="px-5 py-2 rounded-xl text-xs font-bold bg-rose-600 hover:bg-rose-500 disabled:opacity-30 text-white transition-colors"
+                >
+                  Analyze
+                </button>
+                {comparison && (
+                  <button
+                    onClick={downloadComparison}
+                    className="flex items-center gap-1 px-4 py-2 rounded-xl text-xs font-semibold bg-white/5 hover:bg-white/10 text-zinc-200 transition-colors"
+                  >
+                    <Download className="w-3.5 h-3.5" /> Save comparison
+                  </button>
+                )}
+              </div>
+              {compareError && <p className="text-xs text-red-400 mt-2">{compareError}</p>}
+              {compareBusy && <ProgressBar label={compareBusy} />}
             </Card>
 
             {!comparison ? (
               <div className="border border-dashed border-white/10 rounded-3xl p-8 text-center">
                 <p className="text-xs text-zinc-500">
-                  Score at least two campaigns to see the cross-analysis.
+                  Load at least two campaigns and press Analyze to cross-analyze them.
                 </p>
               </div>
             ) : (
+
               <>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                   {comparison.campaigns.map((c, i) => (
