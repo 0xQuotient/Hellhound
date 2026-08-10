@@ -679,7 +679,7 @@ function CampaignPanel({
         value={draft.text}
         onChange={(e) => onDraftChange({ ...draft, text: e.target.value })}
         rows={5}
-        placeholder={`Paste ${draft.name || `campaign ${index + 1}`} messages, separated by a line containing only ---`}
+        placeholder={`Paste ${draft.name || `campaign ${index + 1}`} messages here...`}
         className="w-full bg-black/30 border border-white/10 focus:border-rose-500/50 focus:outline-none rounded-xl p-3 text-xs leading-relaxed text-zinc-200 placeholder-zinc-600 resize-y font-mono transition-colors"
       />
       <div className="mt-2">
@@ -1076,7 +1076,7 @@ export default function HellhoundTerminal() {
                 Hellhound
               </h1>
               <p className="text-xs text-zinc-500 mt-1">
-                Deterministic cognitive telemetry · offline rubric
+                Cognitive Meta-Analysis
               </p>
             </div>
           </div>
@@ -1102,7 +1102,7 @@ export default function HellhoundTerminal() {
         {mode === "single" && (
           <>
             <Card className="mb-4">
-              <SectionLabel sub="Scored locally by a fixed rubric — no model, no network, identical output every run.">
+              <SectionLabel sub="Paste one message and press Analyze.">
                 Sample input
               </SectionLabel>
               <textarea
@@ -1185,7 +1185,7 @@ export default function HellhoundTerminal() {
 
                 <Card>
                   <SectionLabel sub="Fixed weights — the composite is a weighted sum of these five measured components.">
-                    Rubric breakdown
+                    Breakdown
                   </SectionLabel>
                   {COMPOSITE_WEIGHTS.map((w) => (
                     <MeterBar
@@ -1349,7 +1349,7 @@ export default function HellhoundTerminal() {
         {mode === "corpus" && (
           <div className="space-y-4">
             <Card>
-              <SectionLabel sub="Drop in a whole set — e.g. 100 emails — and score every message with the same rubric to find the patterns across them.">
+              <SectionLabel sub="Drop in your corpus and press Analyze.">
                 Corpus input
               </SectionLabel>
               <textarea
@@ -1357,7 +1357,7 @@ export default function HellhoundTerminal() {
                 onChange={(e) => setCorpusText(e.target.value)}
                 rows={7}
                 placeholder={
-                  "Paste many messages, separated by a line containing only ---\n\nSubject: Password expiry\n...\n---\nSubject: Invoice overdue\n..."
+                  "Paste your messages here...\n\nSubject: Password expiry\n...\n\nSubject: Invoice overdue\n..."
                 }
                 className="w-full bg-black/30 border border-white/10 focus:border-rose-500/50 focus:outline-none rounded-xl p-3 text-xs leading-relaxed text-zinc-200 placeholder-zinc-600 resize-y font-mono transition-colors"
               />
@@ -1691,7 +1691,7 @@ export default function HellhoundTerminal() {
                     </div>
                   </Card>
                   <Card>
-                    <SectionLabel sub="Mean score per campaign on each rubric dimension">
+                    <SectionLabel sub="Mean score per campaign on each dimension">
                       Cross-campaign matrix
                     </SectionLabel>
                     <ComparisonMatrix rows={comparison.rows} series={comparison.series} />
