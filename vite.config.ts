@@ -9,8 +9,7 @@ import { defineConfig } from "@lovable.dev/vite-tanstack-config";
 export default defineConfig({
   tanstackStart: {
     // The tool is 100% client-side: no server functions, no loaders, no secrets.
-    // SPA mode emits a static shell that any plain HTTP server can serve.
+    // The custom entry just delegates to the framework handler.
     server: { entry: "server" },
-    spa: { enabled: true },
   },
 });
