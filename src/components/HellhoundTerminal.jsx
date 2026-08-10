@@ -732,6 +732,9 @@ export default function HellhoundTerminal() {
 
   // Campaigns — an unbounded list of slots, compared all at once.
   const [slots, setSlots] = useState(() => [newSlot("Campaign 1"), newSlot("Campaign 2")]);
+  const [compareBusy, setCompareBusy] = useState(null);
+  const [compareError, setCompareError] = useState(null);
+
 
   /* Everything above lives in React memory only. No localStorage, no
      sessionStorage, no cookies, no server, no database. Reloading the tab
