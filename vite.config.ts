@@ -10,6 +10,7 @@ export default defineConfig({
   tanstackStart: {
     // The tool is 100% client-side: no server functions, no loaders, no secrets.
     // SPA mode emits a static shell that any plain HTTP server can serve.
+    server: { entry: "server" },
     spa: { enabled: true },
   },
 });
