@@ -622,10 +622,8 @@ function CampaignPanel({
   onDraftChange,
   onFiles,
   onRemoveFile,
-  onAnalyze,
   onRemove,
   onClear,
-  onDownload,
   error,
   busy,
   color,
@@ -648,20 +646,12 @@ function CampaignPanel({
         </div>
         <div className="flex items-center gap-3">
           {count > 0 && (
-            <>
-              <button
-                onClick={onDownload}
-                className="flex items-center gap-1 text-xs text-zinc-400 hover:text-rose-300 transition-colors"
-              >
-                <Download className="w-3.5 h-3.5" /> Save
-              </button>
-              <button
-                onClick={onClear}
-                className="flex items-center gap-1 text-xs text-zinc-500 hover:text-red-400 transition-colors"
-              >
-                <X className="w-3.5 h-3.5" /> Clear
-              </button>
-            </>
+            <button
+              onClick={onClear}
+              className="flex items-center gap-1 text-xs text-zinc-500 hover:text-red-400 transition-colors"
+            >
+              <X className="w-3.5 h-3.5" /> Clear
+            </button>
           )}
           {canRemove && (
             <button
@@ -693,23 +683,19 @@ function CampaignPanel({
       {error && <p className="text-xs text-red-400 mt-2">{error}</p>}
       {busy && <ProgressBar label={busy} />}
 
-      <div className="flex items-center justify-between mt-3">
+      <div className="mt-3">
         <span className="text-xs text-zinc-600">
           {count > 0
             ? `${count.toLocaleString()} messages · ${campaign.summary.channelMix.map((m) => `${m.count} ${m.key.toLowerCase()}`).join(" + ")}`
-            : "No messages analyzed"}
+            : pending > 0
+              ? `${pending.toLocaleString()} queued · not analyzed yet`
+              : "Nothing queued"}
         </span>
-        <button
-          onClick={onAnalyze}
-          disabled={!!busy || pending === 0}
-          className="px-4 py-1.5 rounded-xl text-xs font-semibold bg-white/5 hover:bg-white/10 disabled:opacity-30 text-zinc-200 transition-colors"
-        >
-          Analyze
-        </button>
       </div>
     </div>
   );
 }
+
 
 /* ============================================================
    MAIN COMPONENT
