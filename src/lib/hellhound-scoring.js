@@ -443,8 +443,12 @@ export const CHANNELS = ["Email", "SMS", "Voice", "Chat", "Other"];
 export const OUTCOMES = ["Unknown", "No Reaction", "Clicked", "Reported", "Credentials Entered"];
 
 /* Bump when any lexicon, weight or formula changes — scores are only
-   comparable within one rubric version. Stamped into every export. */
-export const RUBRIC_VERSION = "1.0.0";
+   comparable within one rubric version. Stamped into every export.
+   1.1.0: word-boundary term matching (was raw substring) + a fixed-window
+   negation discount on lexicon/Cialdini hits. Scores from 1.0.0 are not
+   directly comparable to 1.1.0 on messages with negation or short terms
+   that previously matched inside larger words. */
+export const RUBRIC_VERSION = "1.1.0";
 
 /* Composite index weights — published so the score is auditable. */
 export const COMPOSITE_WEIGHTS = [
@@ -480,16 +484,45 @@ export function stdev(nums) {
   return Math.sqrt(mean(nums.map((n) => (n - m) ** 2)));
 }
 
+/* Negators checked in the ~4 words immediately preceding a match.
+   Deliberately narrow: this is a fixed-window heuristic, not a parse
+   of clause structure, so it will miss negation that crosses a comma
+   or a second clause ("we are not going to pretend this isn't..."). */
+const NEGATORS = ["not", "n't", "never", "no", "without", "isn't", "wasn't", "won't", "don't"];
+
+function escapeRegExp(s) {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/* Word-boundary aware. \\b fails on terms with a non-word leading/trailing
+   char (rare in these lexicons but possible), so boundaries are asserted
+   with lookaround against [a-z0-9] instead of relying on \\b alone. */
+function buildTermRegex(term) {
+  const escaped = escapeRegExp(term);
+  return new RegExp(`(?<![a-z0-9])${escaped}(?![a-z0-9])`, "gi");
+}
+
+function isNegatedAt(lowerText, matchIndex) {
+  const start = Math.max(0, matchIndex - 40);
+  const preceding = lowerText.slice(start, matchIndex);
+  const words = preceding.split(/\s+/).filter(Boolean).slice(-4);
+  return words.some((w) => NEGATORS.some((neg) => w === neg || w.endsWith(neg)));
+}
+
 function countMatches(lowerText, terms) {
   const hits = [];
   terms.forEach((term) => {
-    let idx = lowerText.indexOf(term);
+    const re = buildTermRegex(term);
+    let match;
     let count = 0;
-    while (idx !== -1 && count < 20) {
+    let negated = 0;
+    while ((match = re.exec(lowerText)) && count < 20) {
       count++;
-      idx = lowerText.indexOf(term, idx + term.length);
+      if (isNegatedAt(lowerText, match.index)) negated++;
+      if (match.index === re.lastIndex) re.lastIndex++;
     }
-    if (count > 0) hits.push({ term, count });
+    const effective = count - negated;
+    if (effective > 0) hits.push({ term, count: effective, negated });
   });
   return hits;
 }
