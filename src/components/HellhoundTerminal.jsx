@@ -1081,7 +1081,7 @@ export default function HellhoundTerminal() {
                 Hellhound
               </h1>
               <p className="text-xs text-zinc-500 mt-1">
-                Cognitive Meta-Analysis
+                Psychological Meta-Analysis
               </p>
             </div>
           </div>
