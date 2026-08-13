@@ -12,7 +12,7 @@
     "format": "prettier --write .",
     "test": "vitest run",
     "test:watch": "vitest",
-    "electron": "electron electron/main.cjs",
+    "electron": "electron --ozone-platform-hint=auto electron/main.cjs",
     "app": "concurrently -k \"npm:electron:dev\" \"wait-on tcp:5173 && npm run electron\"",
     "electron:dev": "vite dev --port 5173 --strictPort"
   },
