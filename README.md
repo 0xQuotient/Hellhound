@@ -21,6 +21,8 @@ a corpus. The request list stays empty after the initial asset load.
 
 ## Installing
 
+### Linux
+
 One command downloads and sets everything up, including Node.js if it isn't already
 installed:
 
@@ -45,6 +47,55 @@ hellhound
 ```
 
 Setup: one command. Launch: one command.
+
+### Windows
+
+`install.sh` is a bash script that shells out to `dnf`, `apt`, or `pacman`, so it does not
+run on Windows. Set up manually instead.
+
+1. Install [Node.js 22 LTS](https://nodejs.org/en/download) and
+   [Git for Windows](https://git-scm.com/download/win).
+2. Clone and install dependencies, in PowerShell:
+
+   ```powershell
+   git clone https://github.com/0xQuotient/Hellhound.git $HOME\Hellhound
+   cd $HOME\Hellhound
+   npm install
+   ```
+
+3. Launch it:
+
+   ```powershell
+   npm run app     # Electron desktop window
+   npm run dev     # or the web app only, http://localhost:5173
+   ```
+
+There is no `hellhound` shortcut command on Windows, because `bin/hellhound` is a bash
+script. Run `npm run app` from the install directory.
+
+If `npm run app` starts the dev server but never opens a window, run the two halves in
+separate terminals:
+
+```powershell
+npm run dev
+```
+
+```powershell
+npx electron electron/main.cjs
+```
+
+The second command skips the `--ozone-platform-hint` flag that `npm run electron` passes,
+which only means anything on Linux.
+
+Nothing in the scoring engine or UI is platform-specific, so the offline guarantee above
+holds identically on Windows.
+
+#### WSL
+
+If you would rather use the one-command installer, it works unchanged inside WSL2. On
+Windows 11 the Electron window renders through WSLg with no extra setup. On Windows 10,
+WSL2 has no GUI support, so run `npm run dev` inside WSL and open
+`http://localhost:5173` in a normal Windows browser.
 
 ## Running it from source
 
