@@ -1,8 +1,8 @@
 # Hellhound
 
-An offline console for **meta-analysis of social-engineering text**. Drop in a corpus of
-phishing simulations, SMS pretexts, or call scripts and get deterministic, rubric-based
-scores plus cross-message and cross-campaign patterns.
+An offline console for meta analysis of social engineering text. Drop in a corpus of
+phishing simulations, SMS pretexts, or call scripts and get deterministic, rubric based
+scores plus cross message and cross campaign patterns.
 
 No model, no API key, no network call, no storage. Every number is produced by a
 published rubric in `src/lib/hellhound-scoring.js`, readable and re-implementable line
