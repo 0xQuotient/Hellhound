@@ -14,6 +14,8 @@
     "test:watch": "vitest",
     "electron": "electron --ozone-platform-hint=auto electron/main.cjs",
     "app": "concurrently -k \"npm:electron:dev\" \"wait-on tcp:5173 && npm run electron\"",
+    "electron:plain": "electron electron/main.cjs",
+    "app:plain": "concurrently -k \"npm:electron:dev\" \"wait-on tcp:5173 && npm run electron:plain\"",
     "electron:dev": "vite dev --port 5173 --strictPort"
   },
   "dependencies": {

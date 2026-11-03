@@ -21,7 +21,7 @@ a corpus. The request list stays empty after the initial asset load.
 
 ## Installing
 
-### Linux
+### For Linux Users
 
 One command downloads and sets everything up, including Node.js if it isn't already
 installed:
@@ -48,54 +48,55 @@ hellhound
 
 Setup: one command. Launch: one command.
 
-### Windows
+### For Windows Users
 
-`install.sh` is a bash script that shells out to `dnf`, `apt`, or `pacman`, so it does not
-run on Windows. Set up manually instead.
-
-1. Install [Node.js 22 LTS](https://nodejs.org/en/download) and
-   [Git for Windows](https://git-scm.com/download/win).
-2. Clone and install dependencies, in PowerShell:
-
-   ```powershell
-   git clone https://github.com/0xQuotient/Hellhound.git $HOME\Hellhound
-   cd $HOME\Hellhound
-   npm install
-   ```
-
-3. Launch it:
-
-   ```powershell
-   npm run app     # Electron desktop window
-   npm run dev     # or the web app only, http://localhost:5173
-   ```
-
-There is no `hellhound` shortcut command on Windows, because `bin/hellhound` is a bash
-script. Run `npm run app` from the install directory.
-
-If `npm run app` starts the dev server but never opens a window, run the two halves in
-separate terminals:
+One command, in PowerShell:
 
 ```powershell
-npm run dev
+irm https://raw.githubusercontent.com/0xQuotient/Hellhound/main/install.ps1 | iex
 ```
+
+This installs Git and Node.js through `winget` if they are missing, clones the repo into
+`%USERPROFILE%\Hellhound`, installs dependencies, and puts a `hellhound` command on your
+PATH. To read the script before running it:
 
 ```powershell
-npx electron electron/main.cjs
+irm https://raw.githubusercontent.com/0xQuotient/Hellhound/main/install.ps1 -OutFile install.ps1
+notepad install.ps1   # read it
+powershell -ExecutionPolicy Bypass -File .\install.ps1
 ```
 
-The second command skips the `--ozone-platform-hint` flag that `npm run electron` passes,
-which only means anything on Linux.
+Then open a **new** terminal, so it picks up the updated PATH, and run:
+
+```powershell
+hellhound
+```
+
+Setup: one command. Launch: one command.
+
+Do not use the bash installer above. It calls `dnf`/`apt`/`pacman` and `sudo`, so piping
+it to `bash` fails on Windows with `bash : The term 'bash' is not recognized`, and
+installing bash does not fix it.
 
 Nothing in the scoring engine or UI is platform-specific, so the offline guarantee above
 holds identically on Windows.
 
-#### WSL
+### For macOS Users
 
-If you would rather use the one-command installer, it works unchanged inside WSL2. On
-Windows 11 the Electron window renders through WSLg with no extra setup. On Windows 10,
-WSL2 has no GUI support, so run `npm run dev` inside WSL and open
-`http://localhost:5173` in a normal Windows browser.
+No installer script yet. Install [Node.js 22 LTS](https://nodejs.org/en/download), then:
+
+```sh
+git clone https://github.com/0xQuotient/Hellhound.git ~/Hellhound
+cd ~/Hellhound
+npm install
+npm run app:plain
+```
+
+### Using WSL instead
+
+The Linux installer works unchanged inside WSL2. On Windows 11 the Electron window
+renders through WSLg with no extra setup. On Windows 10, WSL2 has no GUI support, so run
+`npm run dev` inside WSL and open `http://localhost:5173` in a normal Windows browser.
 
 ## Running it from source
 
@@ -103,6 +104,7 @@ WSL2 has no GUI support, so run `npm run dev` inside WSL and open
 npm install
 npm run dev       # web dev server, http://localhost:5173
 npm run app       # Electron desktop window (dev server + Electron together)
+npm run app:plain # same, without the Linux-only Ozone flag (use this on Windows/macOS)
 npm run build     # client bundle in dist/client, server shell in dist/server
 npm test          # unit tests for the scoring math
 ```
