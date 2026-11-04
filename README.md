@@ -215,7 +215,9 @@ src/lib/hellhound-scoring.test.js  unit tests for the pure math
 src/components/HellhoundTerminal.jsx  the console UI
 src/routes/                        route definitions
 electron/main.cjs                  desktop window entry point
-bin/hellhound                      terminal launcher
+bin/hellhound                      launcher (Linux, bash)
+bin-win/hellhound.cmd              launcher (Windows; separate directory so the
+                                   extensionless bash script is never on PATH)
 install.sh                         self-bootstrapping installer
 ```
 

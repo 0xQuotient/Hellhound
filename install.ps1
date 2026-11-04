@@ -6,7 +6,10 @@ $ErrorActionPreference = 'Stop'
 
 $RepoUrl    = 'https://github.com/0xQuotient/Hellhound.git'
 $InstallDir = Join-Path $HOME 'Hellhound'
-$BinDir     = Join-Path $InstallDir 'bin'
+# Deliberately not 'bin': that holds the extensionless bash launcher, and
+# PowerShell will happily find it on PATH and hand it to Windows, which has no
+# association for it and opens a "choose an app" dialog instead of running it.
+$BinDir     = Join-Path $InstallDir 'bin-win'
 
 Write-Host '== Hellhound installer ==' -ForegroundColor Cyan
 
