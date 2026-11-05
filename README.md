@@ -103,18 +103,22 @@ renders through WSLg with no extra setup. On Windows 10, WSL2 has no GUI support
 ```sh
 npm install
 npm run dev       # web dev server, http://localhost:5173
-npm run app       # Electron desktop window (dev server + Electron together)
+npm run app       # build, then open the Electron window (Linux)
 npm run app:plain # same, without the Linux-only Ozone flag (use this on Windows/macOS)
-npm run build     # client bundle in dist/client, server shell in dist/server
+npm run build     # static site into dist/
 npm test          # unit tests for the scoring math
 ```
 
-All analysis code ships in the client bundle, so the contents of `dist/client` can be
-served from any plain HTTP server in an air-gapped lab (point its 404/fallback at
-`index.html`):
+`npm run app` builds the app and opens the desktop window; the window loads the built
+bundle over a loopback-only static server started inside Electron — no dev server, no
+outbound network.
+
+The build is a plain static site, so for an air-gapped lab you can also serve `dist/`
+from any static file server and open it in a browser:
 
 ```sh
-npx serve dist/client   # or: python3 -m http.server -d dist/client
+npm run build
+npx serve dist   # or: python3 -m http.server -d dist
 ```
 
 ## Modes
@@ -213,12 +217,15 @@ Read this before quoting a number in a report.
 src/lib/hellhound-scoring.js       rubric, CSV streaming, aggregation, comparison
 src/lib/hellhound-scoring.test.js  unit tests for the pure math
 src/components/HellhoundTerminal.jsx  the console UI
-src/routes/                        route definitions
+src/main.tsx                       mounts the app (plain Vite SPA, no router)
+index.html                         static entry
 electron/main.cjs                  desktop window entry point
+electron/static-server.cjs         loopback static server the window loads from
 bin/hellhound                      launcher (Linux, bash)
 bin-win/hellhound.cmd              launcher (Windows; separate directory so the
                                    extensionless bash script is never on PATH)
-install.sh                         self-bootstrapping installer
+install.sh                         self-bootstrapping installer (Linux)
+install.ps1                        self-bootstrapping installer (Windows)
 ```
 
 ## Contributing
