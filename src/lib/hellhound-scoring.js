@@ -1684,29 +1684,55 @@ export function aggregateCorpus(entries) {
     );
   }
 
-  // Outcome correlation, only when outcomes were supplied.
+  // Provenance: how many artifacts, and how much of the sample carries the
+  // outcome labels that every efficacy metric below depends on. Stated up front
+  // so a thin or unlabeled corpus reads as thin, rather than silently producing
+  // empty sections.
   const withOutcome = entries.filter((e) => e.outcome && e.outcome !== "Unknown");
   const isSuccess = (e) => e.outcome === "Clicked" || e.outcome === "Credentials Entered";
   const succeeded = withOutcome.filter(isSuccess);
-  let outcomeSignal = null;
-  if (succeeded.length >= 2 && withOutcome.length - succeeded.length >= 2) {
-    const others = withOutcome.filter((e) => !isSuccess(e));
-    outcomeSignal = DIMENSIONS.map((d) => ({
-      label: d.label,
-      delta:
-        Math.round(
-          (mean(succeeded.map((e) => e[d.key])) - mean(others.map((e) => e[d.key]))) * 10,
-        ) / 10,
-    }))
-      .sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta))
-      .slice(0, 4);
+  const failed = withOutcome.filter((e) => !isSuccess(e));
+  const provenance = {
+    total: entries.length,
+    labeled: withOutcome.length,
+    unlabeled: entries.length - withOutcome.length,
+    succeeded: succeeded.length,
+    failed: failed.length,
+  };
+
+  // Separation: for each dimension, its mean among artifacts that landed vs
+  // those that didn't, and the gap between them. A large gap means that
+  // dimension is what distinguished what worked from what didn't; a near-zero
+  // gap means it carried no signal in this sample. Every row keeps the two
+  // group sizes so a thin split reads as thin. Only computed with enough of
+  // each outcome for a difference to mean anything.
+  let separation = null;
+  if (succeeded.length >= 3 && failed.length >= 3) {
+    const r1 = (n) => Math.round(n * 10) / 10;
+    separation = {
+      succeeded: succeeded.length,
+      failed: failed.length,
+      dimensions: DIMENSIONS.filter((d) => d.key !== "compositeIndex")
+        .map((d) => {
+          const s = r1(mean(succeeded.map((e) => e[d.key])));
+          const f = r1(mean(failed.map((e) => e[d.key])));
+          return { key: d.key, label: d.label, succeeded: s, failed: f, gap: r1(s - f) };
+        })
+        .sort((a, b) => Math.abs(b.gap) - Math.abs(a.gap)),
+    };
+    const top = separation.dimensions[0];
     findings.push(
-      `Among ${withOutcome.length} messages with recorded outcomes, ${outcomeSignal[0].label.toLowerCase()} differs most between successful and unsuccessful attempts (${outcomeSignal[0].delta > 0 ? "+" : ""}${outcomeSignal[0].delta}).`,
+      `Across ${withOutcome.length} labeled artifacts, ${top.label.toLowerCase()} separated hits from misses most (${top.gap > 0 ? "+" : ""}${top.gap}: ${top.succeeded} vs ${top.failed}).`,
+    );
+  } else if (withOutcome.length) {
+    findings.push(
+      `${withOutcome.length} of ${entries.length} artifacts carry outcome labels; at least 3 hits and 3 misses are needed to separate by technique.`,
     );
   }
 
   return {
     count: entries.length,
+    provenance,
     stats,
     buckets,
     pretextMix,
@@ -1715,7 +1741,7 @@ export function aggregateCorpus(entries) {
     outcomeMix: tally(entries, (e) => e.outcome),
     topTriggers,
     phrases,
-    outcomeSignal,
+    separation,
     findings,
     outliers: {
       highest: pickBy("compositeIndex", 1),

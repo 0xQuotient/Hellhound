@@ -1445,6 +1445,35 @@ export default function HellhoundTerminal() {
                   <StatChip label="Spread (σ)" value={corpusSummary.stats.compositeIndex.stdev} />
                 </div>
 
+                {corpusSummary.provenance && (
+                  <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-zinc-500 font-mono">
+                    <span>
+                      <span className="text-zinc-300">{corpusSummary.provenance.total}</span>{" "}
+                      artifacts
+                    </span>
+                    <span>
+                      <span className="text-zinc-300">{corpusSummary.provenance.labeled}</span>{" "}
+                      labeled
+                      {corpusSummary.provenance.unlabeled > 0 && (
+                        <span className="text-zinc-600">
+                          {" "}
+                          · {corpusSummary.provenance.unlabeled} unlabeled
+                        </span>
+                      )}
+                    </span>
+                    {corpusSummary.provenance.labeled > 0 && (
+                      <span>
+                        <span className="text-emerald-400">
+                          {corpusSummary.provenance.succeeded}
+                        </span>{" "}
+                        hits /{" "}
+                        <span className="text-zinc-400">{corpusSummary.provenance.failed}</span>{" "}
+                        misses
+                      </span>
+                    )}
+                  </div>
+                )}
+
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                   <Card watermark>
                     <SectionLabel>Index distribution</SectionLabel>
@@ -1495,6 +1524,55 @@ export default function HellhoundTerminal() {
                     ))}
                   </ul>
                 </Card>
+
+                {corpusSummary.separation && (
+                  <Card>
+                    <SectionLabel
+                      sub={`Mean of each dimension among the ${corpusSummary.separation.succeeded} artifacts that landed vs the ${corpusSummary.separation.failed} that didn't. A large gap is what separated hits from misses; a near-zero gap carried no signal in this sample.`}
+                    >
+                      What separated hits from misses
+                    </SectionLabel>
+                    <div className="grid grid-cols-[1fr_3.5rem_3.5rem_4rem] gap-2 text-[10px] uppercase tracking-wide text-zinc-600 pb-1 border-b border-white/10">
+                      <span>Dimension</span>
+                      <span className="text-right">Hits</span>
+                      <span className="text-right">Misses</span>
+                      <span className="text-right">Gap</span>
+                    </div>
+                    <div className="space-y-1 mt-1">
+                      {corpusSummary.separation.dimensions.map((d) => {
+                        const mag = Math.min(1, Math.abs(d.gap) / 50);
+                        return (
+                          <div
+                            key={d.key}
+                            className="grid grid-cols-[1fr_3.5rem_3.5rem_4rem] gap-2 text-xs py-1 border-b border-white/5 last:border-0 items-center"
+                          >
+                            <span className="text-zinc-400 truncate">{d.label}</span>
+                            <span className="text-right font-mono tabular-nums text-zinc-300">
+                              {d.succeeded}
+                            </span>
+                            <span className="text-right font-mono tabular-nums text-zinc-500">
+                              {d.failed}
+                            </span>
+                            <span
+                              className="text-right font-mono tabular-nums"
+                              style={{
+                                color:
+                                  d.gap > 0
+                                    ? `rgba(251,113,133,${0.4 + mag * 0.6})`
+                                    : d.gap < 0
+                                      ? `rgba(110,231,183,${0.4 + mag * 0.6})`
+                                      : "#52525b",
+                              }}
+                            >
+                              {d.gap > 0 ? "+" : ""}
+                              {d.gap}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </Card>
+                )}
 
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                   <Card>
