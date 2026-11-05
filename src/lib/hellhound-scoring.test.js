@@ -281,7 +281,9 @@ describe("CSV ingest", () => {
     }
     const { entries } = await ingestFiles([csvFile("big.csv", many.join("\n"))]);
     expect(entries).toHaveLength(8000);
-  });
+    // Scoring 8k messages through the stream reader runs close to vitest's 5s
+    // default on a loaded machine, which made the suite flaky. Give it room.
+  }, 30000);
 
   it("picks the prose column in a header-less file", async () => {
     const lines = [];
