@@ -21,6 +21,8 @@ a corpus. The request list stays empty after the initial asset load.
 
 ## Installing
 
+### For Linux Users
+
 One command downloads and sets everything up, including Node.js if it isn't already
 installed:
 
@@ -46,12 +48,63 @@ hellhound
 
 Setup: one command. Launch: one command.
 
+### For Windows Users
+
+One command, in PowerShell:
+
+```powershell
+irm https://raw.githubusercontent.com/0xQuotient/Hellhound/main/install.ps1 | iex
+```
+
+This installs Git and Node.js through `winget` if they are missing, clones the repo into
+`%USERPROFILE%\Hellhound`, installs dependencies, and puts a `hellhound` command on your
+PATH. To read the script before running it:
+
+```powershell
+irm https://raw.githubusercontent.com/0xQuotient/Hellhound/main/install.ps1 -OutFile install.ps1
+notepad install.ps1   # read it
+powershell -ExecutionPolicy Bypass -File .\install.ps1
+```
+
+Then open a **new** terminal, so it picks up the updated PATH, and run:
+
+```powershell
+hellhound
+```
+
+Setup: one command. Launch: one command.
+
+Do not use the bash installer above. It calls `dnf`/`apt`/`pacman` and `sudo`, so piping
+it to `bash` fails on Windows with `bash : The term 'bash' is not recognized`, and
+installing bash does not fix it.
+
+Nothing in the scoring engine or UI is platform-specific, so the offline guarantee above
+holds identically on Windows.
+
+### For macOS Users
+
+No installer script yet. Install [Node.js 22 LTS](https://nodejs.org/en/download), then:
+
+```sh
+git clone https://github.com/0xQuotient/Hellhound.git ~/Hellhound
+cd ~/Hellhound
+npm install
+npm run app:plain
+```
+
+### Using WSL instead
+
+The Linux installer works unchanged inside WSL2. On Windows 11 the Electron window
+renders through WSLg with no extra setup. On Windows 10, WSL2 has no GUI support, so run
+`npm run dev` inside WSL and open `http://localhost:5173` in a normal Windows browser.
+
 ## Running it from source
 
 ```sh
 npm install
 npm run dev       # web dev server, http://localhost:5173
 npm run app       # Electron desktop window (dev server + Electron together)
+npm run app:plain # same, without the Linux-only Ozone flag (use this on Windows/macOS)
 npm run build     # client bundle in dist/client, server shell in dist/server
 npm test          # unit tests for the scoring math
 ```
@@ -162,7 +215,9 @@ src/lib/hellhound-scoring.test.js  unit tests for the pure math
 src/components/HellhoundTerminal.jsx  the console UI
 src/routes/                        route definitions
 electron/main.cjs                  desktop window entry point
-bin/hellhound                      terminal launcher
+bin/hellhound                      launcher (Linux, bash)
+bin-win/hellhound.cmd              launcher (Windows; separate directory so the
+                                   extensionless bash script is never on PATH)
 install.sh                         self-bootstrapping installer
 ```
 
