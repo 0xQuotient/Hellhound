@@ -16,8 +16,8 @@ by line.
 - Zero telemetry: no analytics, no error reporting, no third-party scripts.
 - Files are read with the browser `File`/stream APIs and never leave the tab.
 
-Verify it yourself: build, serve the output, open DevTools → Network, and analyze
-a corpus. The request list stays empty after the initial asset load.
+Verify it yourself: run `npm run dev`, open DevTools → Network, and analyze a corpus.
+The request list stays empty after the initial asset load.
 
 ## Installing
 
@@ -105,17 +105,16 @@ npm install
 npm run dev       # web dev server, http://localhost:5173
 npm run app       # Electron desktop window (dev server + Electron together)
 npm run app:plain # same, without the Linux-only Ozone flag (use this on Windows/macOS)
-npm run build     # client bundle in dist/client, server shell in dist/server
+npm run build     # assets in .output/public, server shell in .output/server
 npm test          # unit tests for the scoring math
 ```
 
-All analysis code ships in the client bundle, so the contents of `dist/client` can be
-served from any plain HTTP server in an air-gapped lab (point its 404/fallback at
-`index.html`):
-
-```sh
-npx serve dist/client   # or: python3 -m http.server -d dist/client
-```
+For an air-gapped lab, run `npm run dev` on the isolated machine, or launch the desktop
+window with `npm run app:plain`. Both run entirely on localhost with no outbound network.
+Serving the built assets as a bare static site is not supported today: `npm run build`
+emits `.output/public` with no `index.html` — the HTML shell is rendered at request time
+by `.output/server`. Making the bundle self-servable needs prerendering enabled in
+`vite.config.ts`.
 
 ## Modes
 
